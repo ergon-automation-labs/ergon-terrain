@@ -1,0 +1,33 @@
+import Config
+
+# Load .env for local development
+if File.exists?("config/.env") or File.exists?(".env") do
+  path = if File.exists?("config/.env"), do: "config/.env", else: ".env"
+  File.stream!(path)
+  |> Stream.map(&String.trim_trailing/1)
+  |> Stream.reject(&String.starts_with?(&1, "#"))
+  |> Stream.reject(&(&1 == ""))
+  |> Enum.each(fn line ->
+    case String.split(line, "=", parts: 2) do
+      [key, value] -> System.put_env(key, value)
+      _ -> nil
+    end
+  end)
+end
+
+config :bot_army_terrain, ecto_repos: [BotArmyTerrain.Repo]
+
+# Terrain uses its own Postgres schema "terrain" (shared instance).
+# Defaults: local dev DB; override with BOT_ARMY_TERRAIN_DB_* or DATABASE_*.
+config :bot_army_terrain, BotArmyTerrain.Repo,
+  types: BotArmyTerrain.PostgrexTypes,
+  database: System.get_env("BOT_ARMY_TERRAIN_DB_NAME") || System.get_env("DATABASE_NAME", "ergon_terrain_dev"),
+  hostname: System.get_env("BOT_ARMY_TERRAIN_DB_HOST") || System.get_env("DATABASE_HOST", "localhost"),
+  port: String.to_integer(System.get_env("BOT_ARMY_TERRAIN_DB_PORT") || System.get_env("DATABASE_PORT", "5432")),
+  username: System.get_env("BOT_ARMY_TERRAIN_DB_USER") || System.get_env("DATABASE_USER", "postgres"),
+  password: System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") || System.get_env("DATABASE_PASSWORD", "postgres"),
+  pool_size: 10
+
+if File.exists?("config/#{Mix.env()}.exs") do
+  import_config "#{Mix.env()}.exs"
+end
