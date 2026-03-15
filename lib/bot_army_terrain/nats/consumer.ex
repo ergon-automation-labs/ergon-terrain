@@ -61,7 +61,8 @@ defmodule BotArmyTerrain.NATS.Consumer do
       "bot.army.terrain.command.ingest",
       "bot.army.terrain.command.import_cards",
       "bot.army.terrain.command.generate_cards",
-      "events.llm.response.parsed"
+      "events.llm.response.parsed",
+      "events.llm.embedding.created"
     ]
 
     subs =
@@ -165,6 +166,13 @@ defmodule BotArmyTerrain.NATS.Consumer do
   defp handle_command("events.llm.response.parsed", msg) do
     case BotArmyTerrain.Handlers.LlmResponseHandler.handle_parsed(msg) do
       :ignore -> :ok
+      _ -> :ok
+    end
+  end
+
+  defp handle_command("events.llm.embedding.created", msg) do
+    case BotArmyTerrain.Handlers.CardEmbeddingHandler.handle_embedding(msg) do
+      :ok -> :ok
       _ -> :ok
     end
   end

@@ -10,6 +10,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
   # Allow mocking via Application config (for tests)
   defp card_store, do: Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
   defp track_store, do: Application.get_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStore)
+  defp embed_worker, do: Application.get_env(:bot_army_terrain, :embed_worker, BotArmyTerrain.EmbedWorker)
 
   @doc "Handle a parsed LLM response message."
   def handle_parsed(message) do
@@ -94,7 +95,14 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
           generation_model: model
         }
 
-        card_store().create_card(attrs)
+        case card_store().create_card(attrs) do
+          {:ok, card} ->
+            embed_worker().queue_card(card.id)
+            {:ok, card}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 

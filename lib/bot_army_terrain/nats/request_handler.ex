@@ -11,7 +11,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   use GenServer
   require Logger
 
-  alias BotArmyTerrain.{TrackStore, CardStore}
+  alias BotArmyTerrain.{TrackStore, CardStore, Handlers.SessionHandler}
 
   @reconnect_delay_ms 5000
 
@@ -80,7 +80,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     subscriptions = [
       "terrain.tracks.list",
       "terrain.cards.due",
-      "terrain.review.submit"
+      "terrain.review.submit",
+      "terrain.session.start",
+      "terrain.session.end",
+      "terrain.session.stats",
+      "terrain.cards.similar"
     ]
 
     results =
@@ -153,6 +157,62 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       Jason.encode!(%{"cards" => card_list})
     else
       Jason.encode!(%{"error" => "track_id required", "cards" => []})
+    end
+  end
+
+  defp handle_request("terrain.session.start", msg) do
+    SessionHandler.handle_start(msg)
+  end
+
+  defp handle_request("terrain.session.end", msg) do
+    SessionHandler.handle_end(msg)
+  end
+
+  defp handle_request("terrain.session.stats", msg) do
+    session_id = msg["session_id"]
+
+    if session_id do
+      store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+
+      case store.get_session_stats(session_id) do
+        {:ok, stats} -> Jason.encode!(stats)
+        {:error, reason} -> Jason.encode!(%{"error" => inspect(reason)})
+      end
+    else
+      Jason.encode!(%{"error" => "session_id required"})
+    end
+  end
+
+  defp handle_request("terrain.cards.similar", msg) do
+    card_id = msg["card_id"]
+    limit = msg["limit"] || 5
+
+    if card_id do
+      case CardStore.get_card(card_id) do
+        nil ->
+          Jason.encode!(%{"error" => "card not found", "cards" => []})
+
+        card ->
+          if card.embedding_vector do
+            similar_cards = CardStore.find_similar_cards(card.track_id, card.embedding_vector, limit)
+
+            card_list =
+              Enum.map(similar_cards, fn result ->
+                %{
+                  "id" => result.id,
+                  "front" => result.front,
+                  "back" => result.back,
+                  "similarity" => result.similarity
+                }
+              end)
+
+            Jason.encode!(%{"cards" => card_list})
+          else
+            Jason.encode!(%{"error" => "card not embedded yet", "cards" => []})
+          end
+      end
+    else
+      Jason.encode!(%{"error" => "card_id required", "cards" => []})
     end
   end
 

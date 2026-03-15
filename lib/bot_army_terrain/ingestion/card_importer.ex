@@ -11,6 +11,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
   # Allow mocking via Application config (for tests)
   defp card_store, do: Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
   defp track_store, do: Application.get_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStore)
+  defp embed_worker, do: Application.get_env(:bot_army_terrain, :embed_worker, BotArmyTerrain.EmbedWorker)
 
   @doc "Import cards from CSV file."
   def import_csv(path) do
@@ -94,8 +95,12 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
         }
 
         case card_store().create_card(attrs) do
-          {:ok, _card} -> :ok
-          {:error, reason} -> {:error, reason}
+          {:ok, card} ->
+            embed_worker().queue_card(card.id)
+            :ok
+
+          {:error, reason} ->
+            {:error, reason}
         end
       end)
 

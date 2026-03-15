@@ -25,11 +25,14 @@ defmodule BotArmyTerrain.Schemas.Card do
     field :last_reviewed_at, :utc_datetime_usec
     field :state, :string, default: "new"
 
+    field :embedding_vector, Pgvector.Ecto.Vector
+    field :embedded_at, :utc_datetime_usec
+
     timestamps(type: :utc_datetime_usec)
   end
 
   @required [:track_id, :front, :back]
-  @optional [:chunk_id, :card_type, :generation_model, :ease_factor, :interval_days, :repetitions, :next_review_at, :last_reviewed_at, :state]
+  @optional [:chunk_id, :card_type, :generation_model, :ease_factor, :interval_days, :repetitions, :next_review_at, :last_reviewed_at, :state, :embedding_vector, :embedded_at]
 
   def changeset(card, attrs) do
     card

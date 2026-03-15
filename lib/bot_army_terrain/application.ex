@@ -20,6 +20,8 @@ defmodule BotArmyTerrain.Application do
     |> maybe_add_track_store()
     |> maybe_add_chunk_store()
     |> maybe_add_card_store()
+    |> maybe_add_review_session_store()
+    |> maybe_add_embed_worker()
     |> maybe_add_ingestion_worker()
     |> maybe_add_consumer()
     |> maybe_add_request_handler()
@@ -42,6 +44,14 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_card_store(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.CardStore, []} | children]
+  end
+
+  defp maybe_add_review_session_store(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.ReviewSessionStore, []} | children]
+  end
+
+  defp maybe_add_embed_worker(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.EmbedWorker, []} | children]
   end
 
   defp maybe_add_ingestion_worker(children) do

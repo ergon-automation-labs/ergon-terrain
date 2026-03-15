@@ -14,11 +14,12 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
       "What is BEAM?","The Erlang VM","Elixir Basics"
       """
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, 2, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, 2, fn _attrs -> {:ok, %{id: "card-1"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :get_or_create_track_by_name, fn _name ->
         {:ok, %{id: "track-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 2, fn _card_id -> :ok end)
 
       assert {:ok, %{tracks: 1, cards: 2, errors: []}} = CardImporter.import_string(csv)
     end
@@ -31,12 +32,13 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
 
       expect(BotArmyTerrain.CardStoreMock, :create_card, 1, fn attrs ->
         assert attrs[:card_type] == "basic"
-        {:ok, %{}}
+        {:ok, %{id: "card-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :get_or_create_track_by_name, fn _name ->
         {:ok, %{id: "track-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 1, fn _card_id -> :ok end)
 
       assert {:ok, %{tracks: 1, cards: 1, errors: []}} = CardImporter.import_string(csv)
     end
@@ -49,11 +51,12 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
       "Q3?","A3","Track B"
       """
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, 3, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, 3, fn _attrs -> {:ok, %{id: "card-1"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :get_or_create_track_by_name, 2, fn _name ->
         {:ok, %{id: "track-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, 2, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 3, fn _card_id -> :ok end)
 
       assert {:ok, %{tracks: 2, cards: 3, errors: []}} = CardImporter.import_string(csv)
     end
@@ -81,11 +84,12 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
       "Q1?","A1"
       """
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, 1, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, 1, fn _attrs -> {:ok, %{id: "card-1"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :get_or_create_track_by_name, fn _name ->
         {:ok, %{id: "track-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 1, fn _card_id -> :ok end)
 
       assert {:ok, %{tracks: 1, cards: 1, errors: []}} = CardImporter.import_string(csv)
     end
@@ -99,12 +103,13 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
 
       expect(BotArmyTerrain.CardStoreMock, :create_card, 2, fn attrs ->
         assert attrs[:card_type] in ["cloze", "definition"]
-        {:ok, %{}}
+        {:ok, %{id: "card-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :get_or_create_track_by_name, fn _name ->
         {:ok, %{id: "track-1"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 2, fn _card_id -> :ok end)
 
       assert {:ok, %{tracks: 1, cards: 2, errors: []}} = CardImporter.import_string(csv)
     end

@@ -71,6 +71,22 @@ defmodule BotArmyTerrain.CardStore do
     |> Repo.one()
   end
 
+  @doc "Find similar cards by embedding vector (cosine distance)."
+  def find_similar_cards(track_id, query_vector, limit \\ 5) do
+    from(c in Card,
+      where: c.track_id == ^track_id and not is_nil(c.embedding_vector),
+      select: %{
+        id: c.id,
+        front: c.front,
+        back: c.back,
+        similarity: fragment("1 - (? <=> ?)", c.embedding_vector, ^query_vector)
+      },
+      order_by: [desc: fragment("1 - (? <=> ?)", c.embedding_vector, ^query_vector)],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
   @impl true
   def init(_opts) do
     {:ok, %{}}

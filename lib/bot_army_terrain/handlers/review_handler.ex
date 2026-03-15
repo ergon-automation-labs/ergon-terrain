@@ -29,6 +29,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
          {:ok, new_fields} <- apply_sm2(card, quality),
          :ok <- persist_card(card, new_fields) do
       log_review(card_id, quality, new_fields)
+      record_card_review(message)
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -80,5 +81,24 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
       "Review: card=#{card_id} quality=#{quality} → " <>
         "interval=#{fields.interval_days}d state=#{fields.state}"
     )
+  end
+
+  defp record_card_review(message) do
+    case message["session_id"] do
+      nil ->
+        :ok
+
+      session_id ->
+        store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+
+        case store.record_card_review(message) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning("Failed to record card review for session #{session_id}: #{inspect(reason)}")
+            :ok
+        end
+    end
   end
 end

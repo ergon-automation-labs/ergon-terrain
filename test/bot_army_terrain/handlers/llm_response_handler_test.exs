@@ -50,8 +50,9 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         }
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, fn _attrs -> {:ok, %{id: "card-123"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn _card_id -> :ok end)
 
       result = LlmResponseHandler.handle_parsed(message)
       assert result == :ok
@@ -79,9 +80,10 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
       expect(BotArmyTerrain.CardStoreMock, :create_card, fn attrs ->
         assert attrs[:card_type] == "basic"
-        {:ok, %{}}
+        {:ok, %{id: "card-123"}}
       end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn _card_id -> :ok end)
 
       result = LlmResponseHandler.handle_parsed(message)
       assert result == :ok
@@ -106,8 +108,9 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         }
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, 3, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, 3, fn _attrs -> {:ok, %{id: "card-123"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 3, fn _card_id -> :ok end)
 
       result = LlmResponseHandler.handle_parsed(message)
       assert result == :ok
@@ -129,8 +132,9 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         }
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :create_card, fn _attrs -> {:ok, %{}} end)
+      expect(BotArmyTerrain.CardStoreMock, :create_card, fn _attrs -> {:ok, %{id: "card-123"}} end)
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn _track_id -> {:ok, %{}} end)
+      expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn _card_id -> :ok end)
 
       result = LlmResponseHandler.handle_parsed(message)
       assert result == :ok

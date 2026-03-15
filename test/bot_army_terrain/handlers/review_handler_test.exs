@@ -37,6 +37,10 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
         {:ok, updated_card}
       end)
 
+      expect(BotArmyTerrain.ReviewSessionStoreMock, :record_card_review, fn _msg ->
+        :ok
+      end)
+
       assert :ok = ReviewHandler.handle_submit(message)
     end
 
