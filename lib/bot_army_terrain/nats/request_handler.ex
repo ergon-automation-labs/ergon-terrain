@@ -162,17 +162,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_event("terrain.review.submit", msg) do
-    session_id = msg["session_id"]
-    _track_id = msg["track_id"]
-    card_id = msg["card_id"]
-    quality = msg["quality"]
-    elapsed_ms = msg["elapsed_ms"]
-
-    Logger.info("Terrain review: session=#{session_id}, card=#{card_id}, quality=#{quality}, elapsed=#{elapsed_ms}ms")
-
-    # TODO: Record review result in database and update card SRS fields
-    # For now, just log it
-    :ok
+    case BotArmyTerrain.Handlers.ReviewHandler.handle_submit(msg) do
+      :ok -> :ok
+      {:error, reason} -> Logger.error("Review submit failed: #{inspect(reason)}")
+    end
   end
 
   defp send_reply(_state, reply_to, response) do
