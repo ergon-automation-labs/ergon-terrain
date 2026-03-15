@@ -1,0 +1,7 @@
+defmodule BotArmyTerrain.TrackStoreBehaviour do
+  @doc "Get or create a track by name"
+  @callback get_or_create_track_by_name(name :: String.t()) :: {:ok, any} | {:error, any}
+
+  @doc "Update track card count from store"
+  @callback update_card_count_from_store(track_id :: String.t()) :: {:ok, any} | {:error, any}
+end

@@ -57,16 +57,32 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp subscribe(conn, state) do
-    subject = "bot.army.terrain.command.ingest"
+    subjects = [
+      "bot.army.terrain.command.ingest",
+      "bot.army.terrain.command.import_cards",
+      "bot.army.terrain.command.generate_cards",
+      "events.llm.response.parsed"
+    ]
 
-    case Gnat.sub(conn, self(), subject) do
-      {:ok, sub} ->
-        Logger.info("Terrain subscribed to #{subject}")
-        {:noreply, %{state | subscriptions: [sub]}}
+    subs =
+      Enum.map(subjects, fn subject ->
+        case Gnat.sub(conn, self(), subject) do
+          {:ok, sub} ->
+            Logger.info("Terrain subscribed to #{subject}")
+            sub
 
-      {:error, reason} ->
-        Logger.error("Terrain subscribe failed: #{inspect(reason)}")
-        schedule_reconnect(state)
+          {:error, reason} ->
+            Logger.error("Terrain subscribe failed for #{subject}: #{inspect(reason)}")
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    if length(subs) > 0 do
+      {:noreply, %{state | subscriptions: subs}}
+    else
+      Logger.error("Terrain failed to subscribe to any subjects")
+      schedule_reconnect(state)
     end
   end
 
@@ -96,6 +112,60 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
       _ ->
         Logger.info("Terrain ingest: unsupported source_type=#{source_type} or missing path")
+    end
+  end
+
+  defp handle_command("bot.army.terrain.command.import_cards", msg) do
+    payload = msg["payload"] || msg
+    path = payload["path"]
+
+    case path do
+      path when is_binary(path) and path != "" ->
+        case BotArmyTerrain.Ingestion.CardImporter.import_csv(path) do
+          {:ok, stats} -> Logger.info("Terrain card import completed: #{inspect(stats)}")
+          {:error, reason} -> Logger.error("Terrain card import failed: #{inspect(reason)}")
+        end
+
+      _ ->
+        Logger.info("Terrain card import: missing path")
+    end
+  end
+
+  defp handle_command("bot.army.terrain.command.generate_cards", msg) do
+    payload = msg["payload"] || msg
+    path = payload["path"]
+    text = payload["text"]
+    track_name = payload["track_name"] || payload["track"] || "Default"
+    model = payload["model"] || "haiku"
+
+    result =
+      cond do
+        is_binary(path) and path != "" ->
+          BotArmyTerrain.Ingestion.CardGenerator.generate_from_path(path,
+            track_name: track_name,
+            model: model
+          )
+
+        is_binary(text) and text != "" ->
+          BotArmyTerrain.Ingestion.CardGenerator.generate_from_text(text,
+            track_name: track_name,
+            model: model
+          )
+
+        true ->
+          {:error, :missing_path_or_text}
+      end
+
+    case result do
+      {:ok, stats} -> Logger.info("Terrain card generation initiated: #{inspect(stats)}")
+      {:error, reason} -> Logger.error("Terrain card generation failed: #{inspect(reason)}")
+    end
+  end
+
+  defp handle_command("events.llm.response.parsed", msg) do
+    case BotArmyTerrain.Handlers.LlmResponseHandler.handle_parsed(msg) do
+      :ignore -> :ok
+      _ -> :ok
     end
   end
 

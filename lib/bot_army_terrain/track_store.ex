@@ -66,6 +66,16 @@ defmodule BotArmyTerrain.TrackStore do
     end
   end
 
+  @doc "Set track card_count from actual Card count (after ingestion or generation)."
+  def update_card_count_from_store(track_id) do
+    alias BotArmyTerrain.Schemas.Card
+    count = from(c in Card, where: c.track_id == ^track_id, select: count(c.id)) |> Repo.one()
+    case Repo.get(Track, track_id) do
+      nil -> :error
+      track -> track |> Ecto.Changeset.change(card_count: count) |> Repo.update()
+    end
+  end
+
   @impl true
   def init(_opts) do
     {:ok, %{}}
