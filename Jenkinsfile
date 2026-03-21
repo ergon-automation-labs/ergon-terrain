@@ -17,7 +17,7 @@ pipeline {
     STATE_NAME = 'terrain_bot'
     RELEASE_DIR = "/opt/ergon/releases/${BOT_NAME}"
     // Terrain bot releases are published from ergon-automation-labs/ergon_terrain repo
-    GITHUB_REPO = "ergon-automation-labs/ergon_terrain"
+    GITHUB_REPO = "ergon-automation-labs/ergon-terrain"
     SALT_TARGET = '-G bot_army_node_type:air'
   }
 
