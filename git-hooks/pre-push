@@ -5,6 +5,9 @@
 
 set -e
 
+# Add mise-managed binaries to PATH
+export PATH="$HOME/.local/share/mise/shims:$PATH"
+
 echo "🔍 Running pre-push checks..."
 echo ""
 
