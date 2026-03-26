@@ -3,64 +3,91 @@ defmodule BotArmyTerrain.LessonEmbedWorker do
   Background worker for embedding lessons via LLM.
 
   Mirrors EmbedWorker pattern but for lessons: queues lessons for vectorization,
-  publishes embed requests, receives embeddings, and updates lessons with vectors.
+  publishes embed requests to llm.embed.request, receives embeddings via handler,
+  and updates lessons with vector embeddings.
+
+  Fire-and-forget pattern: cast → publish → return immediately.
+  Failures are logged but don't block or retry.
   """
 
   use GenServer
   require Logger
+
+  alias BotArmyTerrain.Repo
+  alias BotArmyTerrain.Schemas.Lesson
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @impl true
-  def init(_) do
+  def init(_opts) do
     {:ok, %{}}
   end
 
-  @doc "Queue a lesson for background embedding."
+  @doc """
+  Queue a lesson for background embedding (fire-and-forget).
+
+  Fetches lesson by ID, publishes embedding request with title+explanation text,
+  receives embeddings asynchronously via LessonEmbeddingHandler.
+  """
   def queue_lesson(lesson_id) do
     GenServer.cast(__MODULE__, {:embed_lesson, lesson_id})
   end
 
   @impl true
   def handle_cast({:embed_lesson, lesson_id}, state) do
-    lesson = BotArmyTerrain.Repo.get(BotArmyTerrain.Schemas.Lesson, lesson_id)
+    case Repo.get(Lesson, lesson_id) do
+      nil ->
+        Logger.warning("Lesson #{lesson_id} not found for embedding")
+        {:noreply, state}
 
-    if lesson do
-      text = "#{lesson.title} #{lesson.explanation}"
+      lesson ->
+        case publish_embed_request(lesson) do
+          :ok ->
+            Logger.debug("Queued embedding for lesson #{lesson_id}")
+            {:noreply, state}
 
-      payload = %{
-        "event" => "llm.embed.request",
-        "event_id" => UUID.uuid4() |> to_string(),
-        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
-        "source" => "bot_army_terrain",
-        "source_node" => get_node_name(),
-        "triggered_by" => "lesson_embed_worker",
-        "schema_version" => "1.0",
-        "payload" => %{
+          {:error, reason} ->
+            Logger.warning("Failed to queue embedding for lesson #{lesson_id}: #{inspect(reason)}")
+            {:noreply, state}
+        end
+    end
+  end
+
+  # Private helpers
+
+  defp publish_embed_request(lesson) do
+    case get_connection() do
+      {:ok, conn} ->
+        subject = "llm.embed.request"
+        text = "#{lesson.title} #{lesson.explanation}"
+
+        payload = %{
           "text" => text,
-          "lesson_id" => to_string(lesson.id),
+          "lesson_id" => lesson.id,
           "model" => "nomic-embed-text"
         }
-      }
 
-      case get_connection() do
-        {:ok, conn} ->
-          case Gnat.pub(conn, "llm.embed.request", Jason.encode!(payload)) do
-            :ok ->
-              Logger.debug("Queued lesson embedding: #{lesson_id}")
+        event = %{
+          "event" => "llm.embed.request",
+          "event_id" => Ecto.UUID.generate(),
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "source" => "bot_army_terrain",
+          "source_node" => node() |> Atom.to_string(),
+          "triggered_by" => "lesson_embed_worker",
+          "schema_version" => "1.0",
+          "payload" => payload
+        }
 
-            {:error, reason} ->
-              Logger.error("Failed to queue lesson embedding: #{inspect(reason)}")
-          end
+        case Gnat.pub(conn, subject, Jason.encode!(event)) do
+          :ok -> :ok
+          {:error, reason} -> {:error, reason}
+        end
 
-        {:error, _} ->
-          Logger.warning("NATS unavailable, lesson embed deferred: #{lesson_id}")
-      end
+      {:error, reason} ->
+        {:error, reason}
     end
-
-    {:noreply, state}
   end
 
   defp get_connection do
@@ -70,13 +97,6 @@ defmodule BotArmyTerrain.LessonEmbedWorker do
       _ -> {:error, :unavailable}
     catch
       :exit, _ -> {:error, :unavailable}
-    end
-  end
-
-  defp get_node_name do
-    case :inet.gethostname() do
-      {:ok, hostname} -> to_string(hostname)
-      {:error, _} -> "unknown"
     end
   end
 end
