@@ -6,6 +6,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   - terrain.tracks.list → {tracks: [...]}
   - terrain.cards.due → {cards: [...]}
   - terrain.review.submit → fire-and-forget
+  - terrain.lesson.generation.request → {queued: true}
   """
 
   use GenServer
@@ -84,7 +85,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.session.start",
       "terrain.session.end",
       "terrain.session.stats",
-      "terrain.cards.similar"
+      "terrain.cards.similar",
+      "terrain.lesson.generation.request"
     ]
 
     results =
@@ -213,6 +215,29 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       end
     else
       Jason.encode!(%{"error" => "card_id required", "cards" => []})
+    end
+  end
+
+  defp handle_request("terrain.lesson.generation.request", msg) do
+    chunk_id = msg["chunk_id"]
+    chunk_title = msg["chunk_title"] || ""
+    chunk_content = msg["chunk_content"] || ""
+
+    if chunk_id && chunk_title && chunk_content do
+      # Queue for background generation
+      BotArmyTerrain.LessonGenerationWorker.queue_lesson(chunk_id, chunk_title, chunk_content)
+
+      Jason.encode!(%{
+        "ok" => true,
+        "queued" => true,
+        "chunk_id" => chunk_id,
+        "message" => "Lesson generation queued"
+      })
+    else
+      Jason.encode!(%{
+        "ok" => false,
+        "error" => "chunk_id, chunk_title, and chunk_content required"
+      })
     end
   end
 

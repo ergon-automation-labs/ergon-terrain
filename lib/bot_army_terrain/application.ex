@@ -23,6 +23,7 @@ defmodule BotArmyTerrain.Application do
     |> maybe_add_review_session_store()
     |> maybe_add_embed_worker()
     |> maybe_add_ingestion_worker()
+    |> maybe_add_lesson_generation_worker()
     |> maybe_add_consumer()
     |> maybe_add_request_handler()
 
@@ -56,6 +57,10 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_ingestion_worker(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.Ingestion.IngestionWorker, []} | children]
+  end
+
+  defp maybe_add_lesson_generation_worker(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.LessonGenerationWorker, []} | children]
   end
 
   defp maybe_add_consumer(children) do
