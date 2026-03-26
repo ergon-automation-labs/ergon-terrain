@@ -28,7 +28,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
 
   defp build_lesson_prompt(chunk_title, chunk_content) do
     """
-    You are an expert educator creating a detailed learning lesson.
+    You are an expert educator creating a detailed learning lesson and quiz show question.
 
     Concept: #{chunk_title}
 
@@ -41,10 +41,25 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
     4. Suggests how to practice/apply
     5. Includes edge cases or common misconceptions
 
+    Then create a quiz question and multiple choice answers with a snarky game show host.
+
     Format your response as:
     TITLE: [Clear lesson title]
     EXPLANATION: [Detailed explanation with formatting]
     EXTERNAL_LINK: [If known, a URL for further reading; otherwise ""]
+    QUIZ_QUESTION: [One clear question that tests understanding of this concept]
+    OPTION_1: [One of 4 answer choices — vary which position is correct]
+    OPTION_2: [One of 4 answer choices]
+    OPTION_3: [One of 4 answer choices]
+    OPTION_4: [One of 4 answer choices]
+    CORRECT_OPTION: [1, 2, 3, or 4]
+    HOST_INTRO: [1-2 sentences of snarky game show host energy setting up the question]
+    HOST_CORRECT: [1-2 sentences: celebratory but slightly smug, reference the concept]
+    HOST_WRONG: [1-2 sentences: cutting/snarky judgment, lightly roast the wrong answer, still clarify the concept]
+    NPC_1_NAME: [Amusing wrong-contestant name, e.g. "Confused Carl", "Overconfident Owen"]
+    NPC_1_ANSWER: [1/2/3/4 — must be a wrong answer option]
+    NPC_2_NAME: [Another amusing wrong-contestant name]
+    NPC_2_ANSWER: [1/2/3/4 — must be wrong, and different from NPC_1_ANSWER]
     """
   end
 
@@ -110,6 +125,13 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
       "title" => response["title"],
       "explanation" => response["explanation"],
       "external_link" => Map.get(response, "external_link", ""),
+      "quiz_question" => Map.get(response, "quiz_question"),
+      "quiz_options" => Map.get(response, "quiz_options", []),
+      "quiz_correct_index" => Map.get(response, "quiz_correct_index"),
+      "host_intro" => Map.get(response, "host_intro"),
+      "host_correct" => Map.get(response, "host_correct"),
+      "host_wrong" => Map.get(response, "host_wrong"),
+      "npc_players" => Map.get(response, "npc_players", []),
       "generated_at" => DateTime.utc_now()
     }
 
@@ -124,6 +146,13 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
            "title" => lesson.title,
            "explanation" => lesson.explanation,
            "external_link" => lesson.external_link,
+           "quiz_question" => lesson.quiz_question,
+           "quiz_options" => lesson.quiz_options,
+           "quiz_correct_index" => lesson.quiz_correct_index,
+           "host_intro" => lesson.host_intro,
+           "host_correct" => lesson.host_correct,
+           "host_wrong" => lesson.host_wrong,
+           "npc_players" => lesson.npc_players,
            "generated_at" => DateTime.to_iso8601(lesson.generated_at)
          }}
 
@@ -147,6 +176,21 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
       "title" => "Understanding: #{chunk_title}",
       "explanation" => demo_explanation,
       "external_link" => "",
+      "quiz_question" => "Which statement about #{chunk_title} is most accurate?",
+      "quiz_options" => [
+        "It is a core concept with practical applications",
+        "It is rarely used in production code",
+        "It only applies to advanced use cases",
+        "It is specific to functional programming only"
+      ],
+      "quiz_correct_index" => 0,
+      "host_intro" => "Let's test your understanding of #{chunk_title}! The stakes are high and your dignity is on the line.",
+      "host_correct" => "Well done! You clearly understand #{chunk_title} better than your fellow contestants.",
+      "host_wrong" => "Oh fascinating choice. Tragically, also wrong. #{chunk_title} is a core concept — perhaps the dojo will help.",
+      "npc_players" => [
+        %{"name" => "Confused Carl", "answer_index" => 1},
+        %{"name" => "Overconfident Owen", "answer_index" => 2}
+      ],
       "generated_at" => DateTime.utc_now()
     }
 
@@ -157,6 +201,13 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
           "title" => lesson.title,
           "explanation" => lesson.explanation,
           "external_link" => lesson.external_link,
+          "quiz_question" => lesson.quiz_question,
+          "quiz_options" => lesson.quiz_options,
+          "quiz_correct_index" => lesson.quiz_correct_index,
+          "host_intro" => lesson.host_intro,
+          "host_correct" => lesson.host_correct,
+          "host_wrong" => lesson.host_wrong,
+          "npc_players" => lesson.npc_players,
           "generated_at" => DateTime.to_iso8601(lesson.generated_at)
         }
 
@@ -167,6 +218,21 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
           "title" => "Understanding: #{chunk_title}",
           "explanation" => demo_explanation,
           "external_link" => "",
+          "quiz_question" => "Which statement about #{chunk_title} is most accurate?",
+          "quiz_options" => [
+            "It is a core concept with practical applications",
+            "It is rarely used in production code",
+            "It only applies to advanced use cases",
+            "It is specific to functional programming only"
+          ],
+          "quiz_correct_index" => 0,
+          "host_intro" => "Let's test your understanding of #{chunk_title}!",
+          "host_correct" => "Well done! You understand #{chunk_title}.",
+          "host_wrong" => "Not quite right. Study the dojo for more help.",
+          "npc_players" => [
+            %{"name" => "Confused Carl", "answer_index" => 1},
+            %{"name" => "Overconfident Owen", "answer_index" => 2}
+          ],
           "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
         }
     end

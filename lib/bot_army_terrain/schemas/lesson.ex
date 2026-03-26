@@ -15,13 +15,20 @@ defmodule BotArmyTerrain.Schemas.Lesson do
     field :embedding_vector, Pgvector.Ecto.Vector
     field :embedded_at, :utc_datetime_usec
     field :generated_at, :utc_datetime_usec
+    field :quiz_question, :string
+    field :quiz_options, {:array, :string}
+    field :quiz_correct_index, :integer
+    field :host_intro, :string
+    field :host_correct, :string
+    field :host_wrong, :string
+    field :npc_players, :map
 
     timestamps(type: :utc_datetime_usec)
   end
 
   def changeset(lesson, attrs) do
     lesson
-    |> cast(attrs, [:chunk_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at])
+    |> cast(attrs, [:chunk_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :host_intro, :host_correct, :host_wrong, :npc_players])
     |> validate_required([:chunk_id, :title, :explanation, :generated_at])
     |> unique_constraint(:chunk_id)
   end

@@ -262,6 +262,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           "explanation" => lesson.explanation,
           "external_link" => lesson.external_link || "",
           "difficulty" => lesson.difficulty,
+          "quiz_question" => lesson.quiz_question,
+          "quiz_options" => lesson.quiz_options || [],
+          "quiz_correct_index" => lesson.quiz_correct_index,
+          "host_intro" => lesson.host_intro,
+          "host_correct" => lesson.host_correct,
+          "host_wrong" => lesson.host_wrong,
+          "npc_players" => lesson.npc_players || [],
           "generated_at" => DateTime.to_iso8601(lesson.generated_at)
         })
     end

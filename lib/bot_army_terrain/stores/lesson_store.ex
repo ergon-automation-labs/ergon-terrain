@@ -21,7 +21,7 @@ defmodule BotArmyTerrain.LessonStore do
     %Lesson{}
     |> Lesson.changeset(attrs)
     |> Repo.insert(
-      on_conflict: {:replace, [:title, :explanation, :external_link, :difficulty, :generated_at, :updated_at]},
+      on_conflict: {:replace, [:title, :explanation, :external_link, :difficulty, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :host_intro, :host_correct, :host_wrong, :npc_players, :updated_at]},
       conflict_target: :chunk_id
     )
   end
