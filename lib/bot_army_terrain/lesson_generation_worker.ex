@@ -98,10 +98,21 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
     [{chunk_id, {title, content, retries}} | _] = Map.to_list(queue)
 
     case generate_lesson(chunk_id, title, content, retries) do
-      {:ok, lesson} ->
+      {:ok, :submitted} ->
+        # LLM request submitted — completion event will fire async via LessonCompletionHandler
+        # Remove from queue now, don't wait for response
+        Logger.debug("Lesson generation request submitted for #{chunk_id}")
+
+        new_queue = Map.delete(queue, chunk_id)
+        {:ok, %{state | queue: new_queue, processing: nil}}
+
+      {:ok, demo_lesson} ->
+        # NATS unavailable fallback — demo lesson was generated synchronously, fire completed event
+        Logger.debug("Lesson generated synchronously (demo fallback) for #{chunk_id}")
+
         emit_event("terrain.lesson.generation.completed", %{
           "chunk_id" => chunk_id,
-          "lesson_id" => Map.get(lesson, "chunk_id"),
+          "lesson_id" => Map.get(demo_lesson, "chunk_id"),
           "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
         })
 
@@ -148,18 +159,24 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
       "progress" => 0.3
     })
 
-    # Call LLM handler to generate lesson
+    # Call LLM handler to submit lesson generation request (fire-and-forget)
+    # Returns {:ok, :submitted} if LLM request succeeded
+    # Returns {:ok, demo_lesson} if NATS unavailable (falls back to synchronous demo)
+    # Returns {:error, reason} on submission failure
     case LessonHandler.generate_lesson(chunk_id, chunk_title, chunk_content) do
-      {:ok, lesson} ->
+      {:ok, :submitted} ->
+        # LLM request submitted successfully — completion event fires async
+        {:ok, :submitted}
+
+      {:ok, demo_lesson} ->
+        # NATS unavailable fallback — demo lesson generated synchronously
         emit_event("terrain.lesson.generation.progress", %{
           "chunk_id" => chunk_id,
           "status" => "saving",
           "progress" => 0.9
         })
 
-        # Phase 2: Store to database with vectorization
-        # For now, just return the lesson
-        {:ok, lesson}
+        {:ok, demo_lesson}
 
       {:error, reason} ->
         {:error, reason}

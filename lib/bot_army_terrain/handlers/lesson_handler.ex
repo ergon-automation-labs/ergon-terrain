@@ -7,23 +7,143 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
   """
 
   require Logger
+  require Regex
 
   @doc """
   Generate a lesson for a chunk using LLM.
 
-  Returns {:ok, lesson_map} or {:error, reason}.
+  Submits to LLM asynchronously (fire-and-forget). Returns {:ok, :submitted} if LLM request succeeds.
+  If NATS unavailable, falls back to demo lesson synchronously.
+  Actual lesson data arrives asynchronously via LessonCompletionHandler.
   """
   def generate_lesson(chunk_id, chunk_title, chunk_content) do
-    prompt = build_lesson_prompt(chunk_title, chunk_content)
+    case submit_llm_request(chunk_id, chunk_title, chunk_content) do
+      :ok ->
+        # LLM request submitted — lesson data will arrive asynchronously
+        {:ok, :submitted}
 
-    case call_llm(chunk_id, chunk_title, prompt) do
-      {:ok, response} ->
-        parse_lesson_response(chunk_id, response)
+      {:error, :nats_unavailable} ->
+        # NATS not available — fall back to demo lesson generated synchronously
+        demo = build_demo_lesson(chunk_id, chunk_title)
+        {:ok, demo}
 
       {:error, reason} ->
-        Logger.error("LLM call failed for lesson #{chunk_id}: #{inspect(reason)}")
+        Logger.error("LLM request failed for lesson #{chunk_id}: #{inspect(reason)}")
         {:error, reason}
     end
+  end
+
+  @doc """
+  Submit LLM request for lesson generation (fire-and-forget).
+
+  Publishes to "llm.prompt.submit" with proper envelope and payload fields.
+  Does NOT wait for response — completion handled async by LessonCompletionHandler.
+  """
+  def submit_llm_request(chunk_id, chunk_title, chunk_content) do
+    prompt = build_lesson_prompt(chunk_title, chunk_content)
+    prompt_id = UUID.uuid4() |> to_string()
+
+    envelope = %{
+      "event" => "llm.prompt.submit",
+      "event_id" => UUID.uuid4() |> to_string(),
+      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "source" => "bot_army_terrain",
+      "source_node" => get_node_name(),
+      "triggered_by" => "lesson_handler",
+      "schema_version" => "1.0",
+      "source_metadata" => %{
+        "source_domain" => "lesson_generation",
+        "chunk_id" => chunk_id
+      },
+      "payload" => %{
+        "text" => prompt,
+        "prompt_id" => prompt_id,
+        "context" => chunk_title
+      }
+    }
+
+    case get_connection() do
+      {:ok, conn} ->
+        case Gnat.pub(conn, "llm.prompt.submit", Jason.encode!(envelope)) do
+          :ok ->
+            Logger.debug("Submitted LLM request for lesson generation: #{chunk_id}")
+            :ok
+
+          {:error, reason} ->
+            Logger.error("Failed to submit LLM request: #{inspect(reason)}")
+            {:error, reason}
+        end
+
+      {:error, _} ->
+        Logger.warning("NATS unavailable for LLM request")
+        {:error, :nats_unavailable}
+    end
+  end
+
+  @doc """
+  Parse LLM text response with labeled fields.
+
+  Expects format with single-line fields like TITLE:, EXTERNAL_LINK:, etc.
+  EXPLANATION field may span multiple lines.
+  Returns attrs map ready for LessonStore.store_lesson/1.
+  """
+  def parse_llm_text(text) do
+    lines = String.split(text, "\n")
+
+    extract = fn prefix ->
+      Enum.find_value(lines, "", fn line ->
+        if String.starts_with?(line, "#{prefix}:") do
+          String.slice(line, String.length("#{prefix}: "), String.length(line)) |> String.trim()
+        end
+      end)
+    end
+
+    # Multi-line EXPLANATION — capture everything from "EXPLANATION:" to next field
+    explanation =
+      case Regex.run(~r/EXPLANATION:\s*(.*?)(?=\n[A-Z_]+:|$)/s, text) do
+        [_, captured] -> String.trim(captured)
+        _ -> extract.("EXPLANATION")
+      end
+
+    correct_index =
+      case extract.("CORRECT_OPTION") do
+        "1" -> 0
+        "2" -> 1
+        "3" -> 2
+        "4" -> 3
+        _ -> 0
+      end
+
+    npc_answer = fn key ->
+      case extract.(key) do
+        "1" -> 0
+        "2" -> 1
+        "3" -> 2
+        "4" -> 3
+        _ -> 1
+      end
+    end
+
+    %{
+      "title" => extract.("TITLE"),
+      "explanation" => explanation,
+      "external_link" => extract.("EXTERNAL_LINK"),
+      "quiz_question" => extract.("QUIZ_QUESTION"),
+      "quiz_options" => [
+        extract.("OPTION_1"),
+        extract.("OPTION_2"),
+        extract.("OPTION_3"),
+        extract.("OPTION_4")
+      ],
+      "quiz_correct_index" => correct_index,
+      "host_intro" => extract.("HOST_INTRO"),
+      "host_correct" => extract.("HOST_CORRECT"),
+      "host_wrong" => extract.("HOST_WRONG"),
+      "npc_players" => [
+        %{"name" => extract.("NPC_1_NAME"), "answer_index" => npc_answer.("NPC_1_ANSWER")},
+        %{"name" => extract.("NPC_2_NAME"), "answer_index" => npc_answer.("NPC_2_ANSWER")}
+      ]
+    }
   end
 
   defp build_lesson_prompt(chunk_title, chunk_content) do
@@ -63,104 +183,6 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
     """
   end
 
-  defp call_llm(chunk_id, chunk_title, prompt) do
-    payload = %{
-      "prompt" => prompt,
-      "context" => chunk_title
-    }
-
-    source_metadata = %{
-      "source_domain" => "lesson_generation",
-      "chunk_id" => chunk_id
-    }
-
-    request = %{
-      "event" => "llm.prompt.submit",
-      "event_id" => UUID.uuid4() |> to_string(),
-      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
-      "source" => "bot_army_terrain",
-      "source_node" => get_node_name(),
-      "triggered_by" => "lesson_handler",
-      "schema_version" => "1.0",
-      "source_metadata" => source_metadata,
-      "payload" => payload
-    }
-
-    # For now, return a demo lesson
-    # Phase 2: Implement actual LLM call via NATS
-    case send_llm_request(request) do
-      :ok ->
-        # Return demo lesson for now
-        {:ok, build_demo_lesson(chunk_id, chunk_title)}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp send_llm_request(request) do
-    case get_connection() do
-      {:ok, conn} ->
-        subject = "events.llm.prompt.submit"
-
-        case Gnat.pub(conn, subject, Jason.encode!(request)) do
-          :ok ->
-            Logger.debug("Sent LLM request for lesson generation")
-            :ok
-
-          {:error, reason} ->
-            Logger.error("Failed to send LLM request: #{inspect(reason)}")
-            {:error, reason}
-        end
-
-      {:error, _} ->
-        Logger.error("NATS unavailable for LLM request")
-        {:error, :nats_unavailable}
-    end
-  end
-
-  defp parse_lesson_response(chunk_id, response) do
-    attrs = %{
-      "chunk_id" => chunk_id,
-      "title" => response["title"],
-      "explanation" => response["explanation"],
-      "external_link" => Map.get(response, "external_link", ""),
-      "quiz_question" => Map.get(response, "quiz_question"),
-      "quiz_options" => Map.get(response, "quiz_options", []),
-      "quiz_correct_index" => Map.get(response, "quiz_correct_index"),
-      "host_intro" => Map.get(response, "host_intro"),
-      "host_correct" => Map.get(response, "host_correct"),
-      "host_wrong" => Map.get(response, "host_wrong"),
-      "npc_players" => Map.get(response, "npc_players", []),
-      "generated_at" => DateTime.utc_now()
-    }
-
-    case BotArmyTerrain.LessonStore.store_lesson(attrs) do
-      {:ok, lesson} ->
-        # Queue for background vectorization
-        BotArmyTerrain.LessonEmbedWorker.queue_lesson(lesson.id)
-
-        {:ok,
-         %{
-           "chunk_id" => chunk_id,
-           "title" => lesson.title,
-           "explanation" => lesson.explanation,
-           "external_link" => lesson.external_link,
-           "quiz_question" => lesson.quiz_question,
-           "quiz_options" => lesson.quiz_options,
-           "quiz_correct_index" => lesson.quiz_correct_index,
-           "host_intro" => lesson.host_intro,
-           "host_correct" => lesson.host_correct,
-           "host_wrong" => lesson.host_wrong,
-           "npc_players" => lesson.npc_players,
-           "generated_at" => DateTime.to_iso8601(lesson.generated_at)
-         }}
-
-      {:error, reason} ->
-        Logger.error("Failed to store lesson #{chunk_id}: #{inspect(reason)}")
-        {:error, reason}
-    end
-  end
 
   defp build_demo_lesson(chunk_id, chunk_title) do
     demo_explanation =

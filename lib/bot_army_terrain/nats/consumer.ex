@@ -62,7 +62,8 @@ defmodule BotArmyTerrain.NATS.Consumer do
       "bot.army.terrain.command.import_cards",
       "bot.army.terrain.command.generate_cards",
       "events.llm.response.parsed",
-      "events.llm.embedding.created"
+      "events.llm.embedding.created",
+      "events.llm.completion.terrain.lesson_generation"
     ]
 
     subs =
@@ -184,6 +185,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
         Logger.warning("Unknown embedding type in payload")
     end
 
+    :ok
+  end
+
+  defp handle_command("events.llm.completion.terrain.lesson_generation", msg) do
+    BotArmyTerrain.Handlers.LessonCompletionHandler.handle_completion(msg)
     :ok
   end
 
