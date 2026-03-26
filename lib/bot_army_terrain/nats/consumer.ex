@@ -171,10 +171,20 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp handle_command("events.llm.embedding.created", msg) do
-    case BotArmyTerrain.Handlers.CardEmbeddingHandler.handle_embedding(msg) do
-      :ok -> :ok
-      _ -> :ok
+    payload = msg["payload"] || %{}
+
+    cond do
+      payload["lesson_id"] ->
+        BotArmyTerrain.Handlers.LessonEmbeddingHandler.handle_embedding(msg)
+
+      payload["card_id"] ->
+        BotArmyTerrain.Handlers.CardEmbeddingHandler.handle_embedding(msg)
+
+      true ->
+        Logger.warning("Unknown embedding type in payload")
     end
+
+    :ok
   end
 
   defp handle_command(_topic, _msg), do: :ok

@@ -86,7 +86,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.session.end",
       "terrain.session.stats",
       "terrain.cards.similar",
-      "terrain.lesson.generation.request"
+      "terrain.lesson.generation.request",
+      "terrain.lesson.get",
+      "terrain.lesson.list"
     ]
 
     results =
@@ -239,6 +241,50 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         "error" => "chunk_id, chunk_title, and chunk_content required"
       })
     end
+  end
+
+  defp handle_request("terrain.lesson.get", msg) do
+    chunk_id = msg["chunk_id"]
+
+    case BotArmyTerrain.LessonStore.get_lesson_by_chunk(chunk_id) do
+      nil ->
+        Jason.encode!(%{
+          "ok" => false,
+          "error" => "lesson not found",
+          "chunk_id" => chunk_id
+        })
+
+      lesson ->
+        Jason.encode!(%{
+          "ok" => true,
+          "chunk_id" => lesson.chunk_id,
+          "title" => lesson.title,
+          "explanation" => lesson.explanation,
+          "external_link" => lesson.external_link || "",
+          "difficulty" => lesson.difficulty,
+          "generated_at" => DateTime.to_iso8601(lesson.generated_at)
+        })
+    end
+  end
+
+  defp handle_request("terrain.lesson.list", _msg) do
+    lessons = BotArmyTerrain.LessonStore.list_lessons()
+
+    lesson_list =
+      Enum.map(lessons, fn l ->
+        %{
+          "chunk_id" => l.chunk_id,
+          "title" => l.title,
+          "external_link" => l.external_link || "",
+          "difficulty" => l.difficulty,
+          "generated_at" => DateTime.to_iso8601(l.generated_at)
+        }
+      end)
+
+    Jason.encode!(%{
+      "ok" => true,
+      "lessons" => lesson_list
+    })
   end
 
   defp handle_request(topic, _msg) do

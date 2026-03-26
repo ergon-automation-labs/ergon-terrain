@@ -105,32 +105,71 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
   end
 
   defp parse_lesson_response(chunk_id, response) do
-    # Parse the LLM response
-    # For now, return structured format
-    {:ok,
-     %{
-       "chunk_id" => chunk_id,
-       "title" => response["title"],
-       "explanation" => response["explanation"],
-       "external_link" => Map.get(response, "external_link", ""),
-       "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
-     }}
+    attrs = %{
+      "chunk_id" => chunk_id,
+      "title" => response["title"],
+      "explanation" => response["explanation"],
+      "external_link" => Map.get(response, "external_link", ""),
+      "generated_at" => DateTime.utc_now()
+    }
+
+    case BotArmyTerrain.LessonStore.store_lesson(attrs) do
+      {:ok, lesson} ->
+        # Queue for background vectorization
+        BotArmyTerrain.LessonEmbedWorker.queue_lesson(lesson.id)
+
+        {:ok,
+         %{
+           "chunk_id" => chunk_id,
+           "title" => lesson.title,
+           "explanation" => lesson.explanation,
+           "external_link" => lesson.external_link,
+           "generated_at" => DateTime.to_iso8601(lesson.generated_at)
+         }}
+
+      {:error, reason} ->
+        Logger.error("Failed to store lesson #{chunk_id}: #{inspect(reason)}")
+        {:error, reason}
+    end
   end
 
   defp build_demo_lesson(chunk_id, chunk_title) do
-    %{
+    demo_explanation =
+      "This lesson explains #{chunk_title}.\n\n" <>
+        "Key points:\n" <>
+        "1. Foundational concept\n" <>
+        "2. Practical application\n" <>
+        "3. Common pitfalls\n\n" <>
+        "(This is a demo lesson. Full LLM-generated lessons coming in Phase 2.)"
+
+    attrs = %{
       "chunk_id" => chunk_id,
       "title" => "Understanding: #{chunk_title}",
-      "explanation" =>
-        "This lesson explains #{chunk_title}.\n\n" <>
-          "Key points:\n" <>
-          "1. Foundational concept\n" <>
-          "2. Practical application\n" <>
-          "3. Common pitfalls\n\n" <>
-          "(This is a demo lesson. Full LLM-generated lessons coming in Phase 2.)",
+      "explanation" => demo_explanation,
       "external_link" => "",
-      "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+      "generated_at" => DateTime.utc_now()
     }
+
+    case BotArmyTerrain.LessonStore.store_lesson(attrs) do
+      {:ok, lesson} ->
+        %{
+          "chunk_id" => chunk_id,
+          "title" => lesson.title,
+          "explanation" => lesson.explanation,
+          "external_link" => lesson.external_link,
+          "generated_at" => DateTime.to_iso8601(lesson.generated_at)
+        }
+
+      {:error, _reason} ->
+        # Fallback to in-memory demo if storage fails
+        %{
+          "chunk_id" => chunk_id,
+          "title" => "Understanding: #{chunk_title}",
+          "explanation" => demo_explanation,
+          "external_link" => "",
+          "generated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+        }
+    end
   end
 
   defp get_connection do
