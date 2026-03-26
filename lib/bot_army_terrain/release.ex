@@ -9,6 +9,23 @@ defmodule BotArmyTerrain.Release do
 
   @app :bot_army_terrain
 
+  def create do
+    load_app()
+
+    for repo <- repos() do
+      case repo.__adapter__.storage_up(repo.config()) do
+        :ok ->
+          :ok
+
+        {:error, :already_up} ->
+          :ok
+
+        {:error, term} ->
+          raise "Could not create database for #{inspect(repo)}: #{inspect(term)}"
+      end
+    end
+  end
+
   def migrate do
     load_app()
 
