@@ -4,8 +4,8 @@ defmodule BotArmyTerrain.Repo.Migrations.CreateCards do
   def change do
     create table(:cards, primary_key: false, prefix: "terrain") do
       add :id, :binary_id, primary_key: true
-      add :track_id, references(:tracks, type: :binary_id, on_delete: :cascade, prefix: "terrain"), null: false
-      add :chunk_id, references(:content_chunks, type: :binary_id, on_delete: :set_null, prefix: "terrain")
+      add :track_id, references(:tracks, type: :binary_id, on_delete: :delete_all, prefix: "terrain"), null: false
+      add :chunk_id, references(:content_chunks, type: :binary_id, on_delete: :nilify_all, prefix: "terrain")
       add :front, :text, null: false
       add :back, :text, null: false
       add :card_type, :string, default: "basic"
