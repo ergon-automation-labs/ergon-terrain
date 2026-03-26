@@ -1,10 +1,10 @@
 defmodule BotArmyTerrain.Repo.Migrations.CreateLessons do
   use Ecto.Migration
 
-  @schema "terrain"
+  @prefix "terrain"
 
   def change do
-    create table(:lessons, primary_key: false, schema: @schema) do
+    create table(:lessons, primary_key: false, prefix: @prefix) do
       add :id, :binary_id, primary_key: true
       add :chunk_id, :binary_id, null: false
       add :title, :string, null: false
@@ -18,7 +18,7 @@ defmodule BotArmyTerrain.Repo.Migrations.CreateLessons do
       timestamps(type: :utc_datetime_usec)
     end
 
-    create unique_index(:lessons, [:chunk_id], schema: @schema, name: :idx_lessons_chunk_id_unique)
-    create index(:lessons, ["embedding_vector"], using: :ivfflat, schema: @schema, name: :idx_lessons_embedding)
+    create unique_index(:lessons, [:chunk_id], prefix: @prefix, name: :idx_lessons_chunk_id_unique)
+    create index(:lessons, ["embedding_vector"], using: :ivfflat, prefix: @prefix, name: :idx_lessons_embedding)
   end
 end

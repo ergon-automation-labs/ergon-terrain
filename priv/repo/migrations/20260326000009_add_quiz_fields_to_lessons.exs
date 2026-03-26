@@ -1,9 +1,9 @@
 defmodule BotArmyTerrain.Repo.Migrations.AddQuizFieldsToLessons do
   use Ecto.Migration
-  @schema "terrain"
+  @prefix "terrain"
 
   def change do
-    alter table(:lessons, schema: @schema) do
+    alter table(:lessons, prefix: @prefix) do
       add :quiz_question, :string
       add :quiz_options, {:array, :string}
       add :quiz_correct_index, :integer
