@@ -122,23 +122,21 @@ pipeline {
       steps {
         sh '''
           echo "==============================================="
-          echo "Running database migrations"
+          echo "Running database create + migrations"
           echo "==============================================="
 
           RELEASE_BIN="${RELEASE_DIR}/current/terrain_bot/bin/terrain_bot"
 
           if [ ! -f "$RELEASE_BIN" ]; then
-            echo "⚠️  Release binary not found at $RELEASE_BIN"
-            echo "Skipping migrations (may already be at correct schema)"
-            exit 0
+            echo "ERROR: Release binary not found at $RELEASE_BIN"
+            exit 1
           fi
 
-          echo "Running: $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()'"
+          echo "Running: $RELEASE_BIN eval 'BotArmyTerrain.Release.create()'"
+          $RELEASE_BIN eval 'BotArmyTerrain.Release.create()'
 
-          $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()' || {
-            echo "⚠️  Migration failed or Release module not found"
-            echo "Continuing with deployment (manual migration may be needed)"
-          }
+          echo "Running: $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()'"
+          $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()'
 
           echo "✓ Migrations complete"
         '''
