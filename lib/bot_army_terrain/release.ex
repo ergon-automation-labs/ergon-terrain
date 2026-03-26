@@ -13,7 +13,7 @@ defmodule BotArmyTerrain.Release do
     load_app()
 
     for repo <- repos() do
-      case repo.__adapter__.storage_up(repo.config()) do
+      case repo.__adapter__().storage_up(repo.config()) do
         :ok ->
           :ok
 
