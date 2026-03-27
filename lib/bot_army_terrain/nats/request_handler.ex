@@ -140,7 +140,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         }
       end)
 
-    Jason.encode!(%{"tracks" => track_list})
+    Jason.encode!(%{"ok" => true, "tracks" => track_list})
   end
 
   defp handle_request("terrain.cards.due", msg) do
