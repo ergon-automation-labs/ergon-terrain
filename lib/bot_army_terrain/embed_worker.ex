@@ -24,6 +24,12 @@ defmodule BotArmyTerrain.EmbedWorker do
   end
 
   @impl true
+  @doc "Queue a chunk for embedding generation (fire-and-forget)."
+  def queue_chunk(chunk_id) do
+    GenServer.cast(__MODULE__, {:embed_chunk, chunk_id})
+  end
+
+  @impl true
   def init(_opts) do
     {:ok, %{}}
   end
@@ -48,6 +54,27 @@ defmodule BotArmyTerrain.EmbedWorker do
     end
   end
 
+  def handle_cast({:embed_chunk, chunk_id}, state) do
+    alias BotArmyTerrain.ChunkStore
+
+    case ChunkStore.get(chunk_id) do
+      nil ->
+        Logger.warning("Chunk #{chunk_id} not found for embedding")
+        {:noreply, state}
+
+      chunk ->
+        case publish_embed_request_for_chunk(chunk) do
+          :ok ->
+            Logger.debug("Queued embedding for chunk #{chunk_id}")
+            {:noreply, state}
+
+          {:error, reason} ->
+            Logger.warning("Failed to queue embedding for chunk #{chunk_id}: #{inspect(reason)}")
+            {:noreply, state}
+        end
+    end
+  end
+
   # Private helpers
 
   defp publish_embed_request(card) do
@@ -58,6 +85,38 @@ defmodule BotArmyTerrain.EmbedWorker do
         payload = %{
           "text" => card.front <> " " <> card.back,
           "card_id" => card.id,
+          "model" => "nomic-embed-text"
+        }
+
+        event = %{
+          "event" => "llm.embed.request",
+          "event_id" => Ecto.UUID.generate(),
+          "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "source" => "bot_army_terrain",
+          "source_node" => node() |> Atom.to_string(),
+          "triggered_by" => "terrain.bot",
+          "schema_version" => "1.0",
+          "payload" => payload
+        }
+
+        case Gnat.pub(conn, subject, Jason.encode!(event)) do
+          :ok -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp publish_embed_request_for_chunk(chunk) do
+    case get_connection() do
+      {:ok, conn} ->
+        subject = "llm.embed.request"
+
+        payload = %{
+          "text" => chunk.content,
+          "chunk_id" => chunk.id,
           "model" => "nomic-embed-text"
         }
 

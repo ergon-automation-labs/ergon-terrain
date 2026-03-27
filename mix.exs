@@ -10,7 +10,7 @@ defmodule BotArmyTerrain.MixProject do
   def project do
     [
       app: :bot_army_terrain,
-      version: "0.1.19",
+      version: "0.1.20",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -39,6 +39,7 @@ defmodule BotArmyTerrain.MixProject do
       {:jason, "~> 1.4"},
       {:logger_json, "~> 5.1"},
       {:elixir_uuid, "~> 1.2"},
+      {:yaml_elixir, "~> 2.9"},
 
       # Development/Test
       {:ex_doc, "~> 0.30", only: :dev},

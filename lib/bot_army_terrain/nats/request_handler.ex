@@ -145,17 +145,36 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     Jason.encode!(%{"ok" => true, "tracks" => track_list})
   end
 
-  defp handle_request("terrain.tracks.import", _msg) do
-    # Fallback endpoint for TUI when primary list fails
-    # Returns count of active tracks available for import
-    tracks = TrackStore.list_tracks(status: "active")
-    Jason.encode!(%{"ok" => true, "imported_count" => length(tracks)})
+  defp handle_request("terrain.tracks.import", msg) do
+    path = msg["path"]
+
+    cond do
+      is_nil(path) ->
+        Jason.encode!(%{"ok" => false, "error" => "path required"})
+
+      not File.exists?(path) ->
+        Jason.encode!(%{"ok" => false, "error" => "file not found: #{path}"})
+
+      true ->
+        case BotArmyTerrain.Ingestion.YamlImporter.import_file(path) do
+          {:ok, result} ->
+            Jason.encode!(%{
+              "ok" => true,
+              "track" => result.track,
+              "track_id" => result.track_id,
+              "chunks_imported" => result.chunks_imported,
+              "chunks_updated" => result.chunks_updated
+            })
+
+          {:error, reason} ->
+            Jason.encode!(%{"ok" => false, "error" => inspect(reason)})
+        end
+    end
   end
 
-  defp handle_request("terrain.track.import", _msg) do
+  defp handle_request("terrain.track.import", msg) do
     # Alias for terrain.tracks.import (singular form)
-    tracks = TrackStore.list_tracks(status: "active")
-    Jason.encode!(%{"ok" => true, "imported_count" => length(tracks)})
+    handle_request("terrain.tracks.import", msg)
   end
 
   defp handle_request("terrain.cards.due", msg) do

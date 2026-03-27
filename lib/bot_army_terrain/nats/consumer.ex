@@ -181,6 +181,18 @@ defmodule BotArmyTerrain.NATS.Consumer do
       payload["card_id"] ->
         BotArmyTerrain.Handlers.CardEmbeddingHandler.handle_embedding(msg)
 
+      payload["chunk_id"] ->
+        embedding = payload["embedding"]
+        chunk_id = payload["chunk_id"]
+
+        case BotArmyTerrain.ChunkStore.update_embedding(chunk_id, embedding) do
+          {:ok, _chunk} ->
+            Logger.debug("Updated embedding for chunk #{chunk_id}")
+
+          {:error, reason} ->
+            Logger.warning("Failed to update embedding for chunk #{chunk_id}: #{inspect(reason)}")
+        end
+
       true ->
         Logger.warning("Unknown embedding type in payload")
     end

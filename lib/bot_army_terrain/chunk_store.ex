@@ -44,6 +44,22 @@ defmodule BotArmyTerrain.ChunkStore do
   @doc "Get chunk by id."
   def get(id), do: Repo.get(ContentChunk, id)
 
+  @doc "Update chunk embedding vector after generation."
+  def update_embedding(chunk_id, embedding_vector) do
+    case Repo.get(ContentChunk, chunk_id) do
+      nil ->
+        {:error, :not_found}
+
+      chunk ->
+        chunk
+        |> Ecto.Changeset.change(
+          embedding_vector: embedding_vector,
+          embedded_at: DateTime.utc_now()
+        )
+        |> Repo.update()
+    end
+  end
+
   @impl true
   def init(_opts) do
     {:ok, %{}}
