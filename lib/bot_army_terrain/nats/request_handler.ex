@@ -158,9 +158,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           }
         end)
 
-      Jason.encode!(%{"cards" => card_list})
+      Jason.encode!(%{"ok" => true, "cards" => card_list})
     else
-      Jason.encode!(%{"error" => "track_id required", "cards" => []})
+      Jason.encode!(%{"ok" => false, "error" => "track_id required", "cards" => []})
     end
   end
 
@@ -194,7 +194,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     if card_id do
       case CardStore.get_card(card_id) do
         nil ->
-          Jason.encode!(%{"error" => "card not found", "cards" => []})
+          Jason.encode!(%{"ok" => false, "error" => "card not found", "cards" => []})
 
         card ->
           if card.embedding_vector do
@@ -210,13 +210,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
                 }
               end)
 
-            Jason.encode!(%{"cards" => card_list})
+            Jason.encode!(%{"ok" => true, "cards" => card_list})
           else
-            Jason.encode!(%{"error" => "card not embedded yet", "cards" => []})
+            Jason.encode!(%{"ok" => false, "error" => "card not embedded yet", "cards" => []})
           end
       end
     else
-      Jason.encode!(%{"error" => "card_id required", "cards" => []})
+      Jason.encode!(%{"ok" => false, "error" => "card_id required", "cards" => []})
     end
   end
 
