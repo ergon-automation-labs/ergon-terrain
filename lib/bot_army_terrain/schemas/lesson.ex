@@ -7,7 +7,7 @@ defmodule BotArmyTerrain.Schemas.Lesson do
   @foreign_key_type :binary_id
 
   schema "lessons" do
-    field :chunk_id, :string
+    field :chunk_id, :binary_id
     field :title, :string
     field :explanation, :string
     field :external_link, :string, default: ""

@@ -11,7 +11,7 @@ defmodule BotArmyTerrain.Schemas.ReviewSession do
   @foreign_key_type :binary_id
 
   schema "review_sessions" do
-    field :track_id, :string
+    field :track_id, :binary_id
     field :state, :string, default: "active"
     field :cards_reviewed, :integer, default: 0
     field :cards_correct, :integer, default: 0
