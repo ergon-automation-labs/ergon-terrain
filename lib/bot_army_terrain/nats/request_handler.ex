@@ -282,6 +282,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         %{
           "chunk_id" => l.chunk_id,
           "title" => l.title,
+          "explanation" => l.explanation,
           "external_link" => l.external_link || "",
           "difficulty" => l.difficulty,
           "generated_at" => DateTime.to_iso8601(l.generated_at)
