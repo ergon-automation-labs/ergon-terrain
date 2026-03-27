@@ -143,6 +143,19 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     Jason.encode!(%{"ok" => true, "tracks" => track_list})
   end
 
+  defp handle_request("terrain.tracks.import", _msg) do
+    # Fallback endpoint for TUI when primary list fails
+    # Returns count of active tracks available for import
+    tracks = TrackStore.list_tracks(status: "active")
+    Jason.encode!(%{"ok" => true, "imported_count" => length(tracks)})
+  end
+
+  defp handle_request("terrain.track.import", _msg) do
+    # Alias for terrain.tracks.import (singular form)
+    tracks = TrackStore.list_tracks(status: "active")
+    Jason.encode!(%{"ok" => true, "imported_count" => length(tracks)})
+  end
+
   defp handle_request("terrain.cards.due", msg) do
     track_id = msg["track_id"]
 
