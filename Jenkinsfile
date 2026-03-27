@@ -107,7 +107,12 @@ pipeline {
           echo "Restarting service to pick up new release..."
           sudo launchctl unload /Library/LaunchDaemons/com.botarmy.${BOT_NAME}.plist 2>/dev/null || true
           sleep 2
-          sudo launchctl load -w /Library/LaunchDaemons/com.botarmy.${BOT_NAME}.plist
+
+          # Load service with error checking
+          if ! sudo launchctl load -w /Library/LaunchDaemons/com.botarmy.${BOT_NAME}.plist; then
+            echo "ERROR: Failed to load service via launchctl"
+            exit 1
+          fi
 
           echo "Checking service health..."
           /opt/bot_army/scripts/health_check.sh ${BOT_NAME}
