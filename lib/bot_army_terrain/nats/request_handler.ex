@@ -80,6 +80,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp subscribe(conn, state) do
     subscriptions = [
       "terrain.tracks.list",
+      "terrain.tracks.import",
+      "terrain.track.import",
       "terrain.cards.due",
       "terrain.review.submit",
       "terrain.session.start",
