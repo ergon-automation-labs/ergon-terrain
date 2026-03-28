@@ -90,7 +90,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.cards.similar",
       "terrain.lesson.generation.request",
       "terrain.lesson.get",
-      "terrain.lesson.list"
+      "terrain.lesson.list",
+      "terrain.game.generate",
+      "terrain.game.status",
+      "terrain.game.get"
     ]
 
     results =
@@ -340,6 +343,64 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "ok" => true,
       "lessons" => lesson_list
     })
+  end
+
+  defp handle_request("terrain.game.generate", msg) do
+    track_id = msg["track_id"]
+
+    cond do
+      is_nil(track_id) ->
+        Jason.encode!(%{"ok" => false, "error" => "track_id required"})
+
+      is_nil(TrackStore.get_track(track_id)) ->
+        Jason.encode!(%{"ok" => false, "error" => "track not found"})
+
+      true ->
+        BotArmyTerrain.GameGenerationWorker.queue_generation(track_id)
+        Jason.encode!(%{"ok" => true, "status" => "queued"})
+    end
+  end
+
+  defp handle_request("terrain.game.status", msg) do
+    track_id = msg["track_id"]
+
+    case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
+      nil ->
+        Jason.encode!(%{"ok" => true, "status" => "not_generated"})
+
+      game_state ->
+        response = %{
+          "ok" => true,
+          "status" => game_state.status,
+          "track_id" => game_state.track_id
+        }
+
+        response =
+          if game_state.generated_at do
+            Map.put(response, "generated_at", DateTime.to_iso8601(game_state.generated_at))
+          else
+            response
+          end
+
+        Jason.encode!(response)
+    end
+  end
+
+  defp handle_request("terrain.game.get", msg) do
+    track_id = msg["track_id"]
+
+    case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
+      %{status: "active"} = game_state ->
+        Jason.encode!(%{
+          "ok" => true,
+          "game_json" => game_state.game_json,
+          "dojo_json" => game_state.dojo_json,
+          "generated_at" => DateTime.to_iso8601(game_state.generated_at)
+        })
+
+      _ ->
+        Jason.encode!(%{"ok" => false, "error" => "game not ready"})
+    end
   end
 
   defp handle_request(topic, _msg) do

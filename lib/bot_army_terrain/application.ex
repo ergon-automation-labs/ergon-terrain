@@ -26,6 +26,8 @@ defmodule BotArmyTerrain.Application do
     |> maybe_add_lesson_generation_worker()
     |> maybe_add_lesson_store()
     |> maybe_add_lesson_embed_worker()
+    |> maybe_add_game_state_store()
+    |> maybe_add_game_generation_worker()
     |> maybe_add_consumer()
     |> maybe_add_request_handler()
 
@@ -71,6 +73,14 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_lesson_embed_worker(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.LessonEmbedWorker, []} | children]
+  end
+
+  defp maybe_add_game_state_store(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.GameStateStore, []} | children]
+  end
+
+  defp maybe_add_game_generation_worker(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.GameGenerationWorker, []} | children]
   end
 
   defp maybe_add_consumer(children) do

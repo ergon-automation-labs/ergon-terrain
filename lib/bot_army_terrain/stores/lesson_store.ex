@@ -21,7 +21,7 @@ defmodule BotArmyTerrain.LessonStore do
     %Lesson{}
     |> Lesson.changeset(attrs)
     |> Repo.insert(
-      on_conflict: {:replace, [:title, :explanation, :external_link, :difficulty, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :host_intro, :host_correct, :host_wrong, :npc_players, :updated_at]},
+      on_conflict: {:replace, [:track_id, :title, :explanation, :external_link, :difficulty, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :host_intro, :host_correct, :host_wrong, :npc_players, :updated_at]},
       conflict_target: :chunk_id
     )
   end
@@ -34,6 +34,11 @@ defmodule BotArmyTerrain.LessonStore do
   @doc "List all lessons, ordered by insertion time."
   def list_lessons do
     Repo.all(from l in Lesson, order_by: [asc: l.inserted_at])
+  end
+
+  @doc "List all lessons for a track, ordered by insertion time."
+  def list_lessons_by_track(track_id) do
+    Repo.all(from l in Lesson, where: l.track_id == ^track_id, order_by: [asc: l.inserted_at])
   end
 
   @doc "Update a lesson."

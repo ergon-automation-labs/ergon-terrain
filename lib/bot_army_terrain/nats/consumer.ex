@@ -63,7 +63,8 @@ defmodule BotArmyTerrain.NATS.Consumer do
       "bot.army.terrain.command.generate_cards",
       "events.llm.response.parsed",
       "events.llm.embedding.created",
-      "events.llm.completion.terrain.lesson_generation"
+      "events.llm.completion.terrain.lesson_generation",
+      "events.llm.completion.terrain.game_generation"
     ]
 
     subs =
@@ -202,6 +203,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   defp handle_command("events.llm.completion.terrain.lesson_generation", msg) do
     BotArmyTerrain.Handlers.LessonCompletionHandler.handle_completion(msg)
+    :ok
+  end
+
+  defp handle_command("events.llm.completion.terrain.game_generation", msg) do
+    BotArmyTerrain.Handlers.GameCompletionHandler.handle_completion(msg)
     :ok
   end
 
