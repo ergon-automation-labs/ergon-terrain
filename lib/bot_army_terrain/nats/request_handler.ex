@@ -155,6 +155,19 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       not File.exists?(path) ->
         Jason.encode!(%{"ok" => false, "error" => "file not found: #{path}"})
 
+      File.dir?(path) ->
+        case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(path) do
+          {:ok, result} ->
+            Jason.encode!(%{
+              "ok" => true,
+              "tracks_imported" => result.tracks_imported,
+              "lessons_imported" => result.lessons_imported
+            })
+
+          {:error, reason} ->
+            Jason.encode!(%{"ok" => false, "error" => inspect(reason)})
+        end
+
       true ->
         case BotArmyTerrain.Ingestion.YamlImporter.import_file(path) do
           {:ok, result} ->

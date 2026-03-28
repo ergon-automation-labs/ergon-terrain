@@ -147,7 +147,7 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
           npc_players: Enum.map(npcs, &Map.get(&1, "name"))
         }
 
-        case LessonStore.create_lesson(attrs) do
+        case LessonStore.store_lesson(attrs) do
           {:ok, _} -> :ok
           {:error, reason} ->
             Logger.warning("Failed to create lesson from #{lesson_path}: #{inspect(reason)}")

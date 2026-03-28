@@ -4,4 +4,5 @@ defmodule BotArmyTerrain.EmbedWorkerBehaviour do
   """
 
   @callback queue_card(card_id :: binary()) :: :ok
+  @callback queue_chunk(chunk_id :: binary()) :: :ok
 end
