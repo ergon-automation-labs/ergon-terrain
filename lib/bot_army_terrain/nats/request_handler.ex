@@ -440,7 +440,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   # Maps container/TUI path prefixes to host runtime paths for bot-side file access.
   # Example: /app/lessons/elixir_bootcamp -> ${TERRAIN_LESSONS_ROOT}/elixir_bootcamp
   defp resolve_import_path(path) when is_binary(path) do
-    lessons_root = System.get_env("TERRAIN_LESSONS_ROOT")
+    lessons_root = configured_lessons_root()
 
     cond do
       is_nil(lessons_root) or String.trim(lessons_root) == "" ->
@@ -460,4 +460,18 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp resolve_import_path(path), do: path
+
+  # Prefer explicit env config, but provide a practical local default
+  # so /app/lessons paths work in common macOS dev setups.
+  defp configured_lessons_root do
+    env_root = System.get_env("TERRAIN_LESSONS_ROOT")
+
+    cond do
+      is_binary(env_root) and String.trim(env_root) != "" ->
+        env_root
+
+      true ->
+        Path.join([System.user_home!(), "Documents", "terrain_gameshow"])
+    end
+  end
 end
