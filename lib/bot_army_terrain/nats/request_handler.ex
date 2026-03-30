@@ -150,21 +150,28 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp handle_request("terrain.tracks.import", msg) do
     path = msg["path"]
+    resolved_path = resolve_import_path(path)
 
     cond do
       is_nil(path) ->
         Jason.encode!(%{"ok" => false, "error" => "path required"})
 
-      not File.exists?(path) ->
-        Jason.encode!(%{"ok" => false, "error" => "file not found: #{path}"})
+      not File.exists?(resolved_path) ->
+        Jason.encode!(%{
+          "ok" => false,
+          "error" => "file not found: #{resolved_path}",
+          "requested_path" => path
+        })
 
-      File.dir?(path) ->
-        case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(path) do
+      File.dir?(resolved_path) ->
+        case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(resolved_path) do
           {:ok, result} ->
             Jason.encode!(%{
               "ok" => true,
               "tracks_imported" => result.tracks_imported,
-              "lessons_imported" => result.lessons_imported
+              "lessons_imported" => result.lessons_imported,
+              "requested_path" => path,
+              "resolved_path" => resolved_path
             })
 
           {:error, reason} ->
@@ -172,14 +179,16 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         end
 
       true ->
-        case BotArmyTerrain.Ingestion.YamlImporter.import_file(path) do
+        case BotArmyTerrain.Ingestion.YamlImporter.import_file(resolved_path) do
           {:ok, result} ->
             Jason.encode!(%{
               "ok" => true,
               "track" => result.track,
               "track_id" => result.track_id,
               "chunks_imported" => result.chunks_imported,
-              "chunks_updated" => result.chunks_updated
+              "chunks_updated" => result.chunks_updated,
+              "requested_path" => path,
+              "resolved_path" => resolved_path
             })
 
           {:error, reason} ->
@@ -427,4 +436,28 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         Logger.error("Cannot send reply: NATS disconnected")
     end
   end
+
+  # Maps container/TUI path prefixes to host runtime paths for bot-side file access.
+  # Example: /app/lessons/elixir_bootcamp -> ${TERRAIN_LESSONS_ROOT}/elixir_bootcamp
+  defp resolve_import_path(path) when is_binary(path) do
+    lessons_root = System.get_env("TERRAIN_LESSONS_ROOT")
+
+    cond do
+      is_nil(lessons_root) or String.trim(lessons_root) == "" ->
+        path
+
+      String.starts_with?(path, "/app/lessons") ->
+        suffix = String.replace_prefix(path, "/app/lessons", "") |> String.trim_leading("/")
+
+        case suffix do
+          "" -> lessons_root
+          _ -> Path.join(lessons_root, suffix)
+        end
+
+      true ->
+        path
+    end
+  end
+
+  defp resolve_import_path(path), do: path
 end

@@ -20,6 +20,18 @@ Organize lessons by track in `/app/lessons/`:
 
 Each track directory name becomes the track name (underscores replaced with spaces).
 
+## Path Mapping In Deployed Environments
+
+When imports are triggered from a surface running in a container, paths often use
+`/app/lessons/...`. Terrain bot can remap that prefix using:
+
+- `TERRAIN_LESSONS_ROOT=/absolute/host/path/to/terrain_gameshow`
+
+Example:
+
+- requested path: `/app/lessons/elixir_bootcamp`
+- resolved path: `${TERRAIN_LESSONS_ROOT}/elixir_bootcamp`
+
 ## NPC Definitions (npcs.yaml)
 
 Define NPCs at the track level in `npcs.yaml`:
