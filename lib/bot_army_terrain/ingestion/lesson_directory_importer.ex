@@ -34,28 +34,51 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
   defp do_import_directory(base_path) do
     case File.ls(base_path) do
       {:ok, entries} ->
-        track_dirs = Enum.filter(entries, &is_track_dir?(Path.join(base_path, &1)))
+        # Check if this is a single track directory (contains .yaml/.yml files)
+        # or a parent directory (contains subdirectories)
+        has_yaml_files = Enum.any?(entries, fn entry ->
+          String.ends_with?(entry, ".yaml") or String.ends_with?(entry, ".yml")
+        end)
 
-        results =
-          Enum.map(track_dirs, fn track_dir_name ->
-            track_dir_path = Path.join(base_path, track_dir_name)
-            import_track_directory(track_dir_name, track_dir_path)
-          end)
+        if has_yaml_files do
+          # Single track directory: use directory name as track name
+          track_name = Path.basename(base_path)
+          case import_track_directory(track_name, base_path) do
+            {:ok, result} ->
+              Logger.info(
+                "Terrain: imported track '#{result.track}' with #{result.lessons_imported} lesson(s)"
+              )
+              {:ok, %{tracks_imported: 1, lessons_imported: result.lessons_imported}}
 
-        # Count totals
-        successful = Enum.filter(results, &match?({:ok, _}, &1))
-        total_tracks = length(successful)
+            {:error, reason} ->
+              Logger.error("Terrain: failed to import track: #{inspect(reason)}")
+              {:error, reason}
+          end
+        else
+          # Parent directory: process all subdirectories as tracks
+          track_dirs = Enum.filter(entries, &is_track_dir?(Path.join(base_path, &1)))
 
-        total_lessons =
-          successful
-          |> Enum.map(fn {:ok, result} -> result.lessons_imported end)
-          |> Enum.sum()
+          results =
+            Enum.map(track_dirs, fn track_dir_name ->
+              track_dir_path = Path.join(base_path, track_dir_name)
+              import_track_directory(track_dir_name, track_dir_path)
+            end)
 
-        Logger.info(
-          "Terrain: imported #{total_tracks} track(s) with #{total_lessons} lesson(s)"
-        )
+          # Count totals
+          successful = Enum.filter(results, &match?({:ok, _}, &1))
+          total_tracks = length(successful)
 
-        {:ok, %{tracks_imported: total_tracks, lessons_imported: total_lessons}}
+          total_lessons =
+            successful
+            |> Enum.map(fn {:ok, result} -> result.lessons_imported end)
+            |> Enum.sum()
+
+          Logger.info(
+            "Terrain: imported #{total_tracks} track(s) with #{total_lessons} lesson(s)"
+          )
+
+          {:ok, %{tracks_imported: total_tracks, lessons_imported: total_lessons}}
+        end
 
       {:error, reason} ->
         {:error, reason}
