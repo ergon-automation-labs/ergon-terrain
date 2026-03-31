@@ -438,20 +438,32 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   # Maps container/TUI path prefixes to host runtime paths for bot-side file access.
-  # Example: /app/lessons/elixir_bootcamp -> ${TERRAIN_LESSONS_ROOT}/elixir_bootcamp
+  # /app/lessons_bot_army/* -> /etc/bot_army/lessons/* (bot-accessible, always works)
+  # /app/lessons/* -> ${TERRAIN_LESSONS_ROOT}/* (user paths, dev default)
   defp resolve_import_path(path) when is_binary(path) do
-    lessons_root = configured_lessons_root()
-
     cond do
-      is_nil(lessons_root) or String.trim(lessons_root) == "" ->
-        path
-
-      String.starts_with?(path, "/app/lessons") ->
-        suffix = String.replace_prefix(path, "/app/lessons", "") |> String.trim_leading("/")
+      String.starts_with?(path, "/app/lessons_bot_army") ->
+        # Bot-accessible path: always maps to /etc/bot_army/lessons
+        suffix = String.replace_prefix(path, "/app/lessons_bot_army", "") |> String.trim_leading("/")
 
         case suffix do
-          "" -> lessons_root
-          _ -> Path.join(lessons_root, suffix)
+          "" -> "/etc/bot_army/lessons"
+          _ -> Path.join("/etc/bot_army/lessons", suffix)
+        end
+
+      String.starts_with?(path, "/app/lessons") ->
+        # User path: maps to configured root (defaults to user home for dev)
+        lessons_root = configured_lessons_root()
+
+        if is_nil(lessons_root) or String.trim(lessons_root) == "" do
+          path
+        else
+          suffix = String.replace_prefix(path, "/app/lessons", "") |> String.trim_leading("/")
+
+          case suffix do
+            "" -> lessons_root
+            _ -> Path.join(lessons_root, suffix)
+          end
         end
 
       true ->
@@ -461,8 +473,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp resolve_import_path(path), do: path
 
-  # Prefer explicit env config, but provide a practical local default
-  # so /app/lessons paths work in common macOS dev setups.
+  # Resolve /app/lessons paths to the bot-readable location.
+  # Prefer explicit TERRAIN_LESSONS_ROOT env var, but default to /etc/bot_army/lessons
+  # (where Salt deploys files and bot_army user has read access).
   defp configured_lessons_root do
     env_root = System.get_env("TERRAIN_LESSONS_ROOT")
 
@@ -471,7 +484,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         env_root
 
       true ->
-        Path.join([System.user_home!(), "Documents", "terrain_gameshow"])
+        "/etc/bot_army/lessons"
     end
   end
 end
