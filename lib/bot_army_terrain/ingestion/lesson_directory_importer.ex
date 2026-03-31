@@ -164,9 +164,9 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
             _ -> 2
           end
 
-        # Convert npc_players array to a map (if provided as YAML array)
+        # Convert npc_players array to a map (npcs is already the array from read_npcs)
         npc_map =
-          case Map.get(npcs, "npc_players", npcs) do
+          case npcs do
             players when is_list(players) ->
               Enum.reduce(players, %{}, fn player, acc ->
                 if is_map(player) and Map.has_key?(player, "name") do
