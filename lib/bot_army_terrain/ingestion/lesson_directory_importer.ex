@@ -154,20 +154,50 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
   defp import_single_lesson(track, npcs, lesson_path) do
     case YamlElixir.read_from_file(lesson_path) do
       {:ok, data} ->
+        # Convert difficulty string to integer: beginner=1, intermediate=2, advanced=3
+        difficulty =
+          case Map.get(data, "difficulty", "intermediate") do
+            "beginner" -> 1
+            "intermediate" -> 2
+            "advanced" -> 3
+            num when is_integer(num) -> num
+            _ -> 2
+          end
+
+        # Convert npc_players array to a map (if provided as YAML array)
+        npc_map =
+          case Map.get(npcs, "npc_players", npcs) do
+            players when is_list(players) ->
+              Enum.reduce(players, %{}, fn player, acc ->
+                if is_map(player) and Map.has_key?(player, "name") do
+                  Map.put(acc, player["name"], player)
+                else
+                  acc
+                end
+              end)
+
+            players when is_map(players) ->
+              players
+
+            _ ->
+              %{}
+          end
+
         attrs = %{
           track_id: track.id,
           chunk_id: generate_chunk_id(lesson_path),
           title: Map.get(data, "title", "Untitled"),
-          explanation: Map.get(data, "content", ""),
+          explanation: Map.get(data, "content", Map.get(data, "explanation", "")),
           external_link: Map.get(data, "external_link"),
-          difficulty: Map.get(data, "difficulty", "intermediate"),
+          difficulty: difficulty,
           quiz_question: Map.get(data, "quiz_question"),
           quiz_options: Map.get(data, "quiz_options", []),
           quiz_correct_index: Map.get(data, "quiz_correct_index"),
           host_intro: Map.get(data, "host_intro"),
           host_correct: Map.get(data, "host_correct"),
           host_wrong: Map.get(data, "host_wrong"),
-          npc_players: Enum.map(npcs, &Map.get(&1, "name"))
+          npc_players: npc_map,
+          generated_at: DateTime.utc_now(:microsecond)
         }
 
         case LessonStore.store_lesson(attrs) do

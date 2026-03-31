@@ -10,7 +10,7 @@ defmodule BotArmyTerrain.MixProject do
   def project do
     [
       app: :bot_army_terrain,
-      version: "0.1.26",
+      version: "0.1.27",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
