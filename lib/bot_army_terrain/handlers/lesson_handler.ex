@@ -124,18 +124,29 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
       end
     end
 
+    quiz_question = extract.("QUIZ_QUESTION")
+    quiz_options = [
+      extract.("OPTION_1"),
+      extract.("OPTION_2"),
+      extract.("OPTION_3"),
+      extract.("OPTION_4")
+    ]
+
     %{
       "title" => extract.("TITLE"),
       "explanation" => explanation,
       "external_link" => extract.("EXTERNAL_LINK"),
-      "quiz_question" => extract.("QUIZ_QUESTION"),
-      "quiz_options" => [
-        extract.("OPTION_1"),
-        extract.("OPTION_2"),
-        extract.("OPTION_3"),
-        extract.("OPTION_4")
-      ],
+      "quiz_question" => quiz_question,
+      "quiz_options" => quiz_options,
       "quiz_correct_index" => correct_index,
+      "quiz_questions" => [
+        %{
+          "question" => quiz_question,
+          "options" => quiz_options,
+          "correct_index" => correct_index,
+          "difficulty" => 2
+        }
+      ],
       "host_intro" => extract.("HOST_INTRO"),
       "host_correct" => extract.("HOST_CORRECT"),
       "host_wrong" => extract.("HOST_WRONG"),
@@ -206,6 +217,19 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
         "It is specific to functional programming only"
       ],
       "quiz_correct_index" => 0,
+      "quiz_questions" => [
+        %{
+          "question" => "Which statement about #{chunk_title} is most accurate?",
+          "options" => [
+            "It is a core concept with practical applications",
+            "It is rarely used in production code",
+            "It only applies to advanced use cases",
+            "It is specific to functional programming only"
+          ],
+          "correct_index" => 0,
+          "difficulty" => 2
+        }
+      ],
       "host_intro" => "Let's test your understanding of #{chunk_title}! The stakes are high and your dignity is on the line.",
       "host_correct" => "Well done! You clearly understand #{chunk_title} better than your fellow contestants.",
       "host_wrong" => "Oh fascinating choice. Tragically, also wrong. #{chunk_title} is a core concept — perhaps the dojo will help.",
@@ -226,6 +250,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
           "quiz_question" => lesson.quiz_question,
           "quiz_options" => lesson.quiz_options,
           "quiz_correct_index" => lesson.quiz_correct_index,
+          "quiz_questions" => lesson.quiz_questions || [],
           "host_intro" => lesson.host_intro,
           "host_correct" => lesson.host_correct,
           "host_wrong" => lesson.host_wrong,
@@ -248,6 +273,19 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
             "It is specific to functional programming only"
           ],
           "quiz_correct_index" => 0,
+          "quiz_questions" => [
+            %{
+              "question" => "Which statement about #{chunk_title} is most accurate?",
+              "options" => [
+                "It is a core concept with practical applications",
+                "It is rarely used in production code",
+                "It only applies to advanced use cases",
+                "It is specific to functional programming only"
+              ],
+              "correct_index" => 0,
+              "difficulty" => 2
+            }
+          ],
           "host_intro" => "Let's test your understanding of #{chunk_title}!",
           "host_correct" => "Well done! You understand #{chunk_title}.",
           "host_wrong" => "Not quite right. Study the dojo for more help.",

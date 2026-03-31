@@ -19,6 +19,7 @@ defmodule BotArmyTerrain.Schemas.Lesson do
     field :quiz_question, :string
     field :quiz_options, {:array, :string}
     field :quiz_correct_index, :integer
+    field :quiz_questions, {:array, :map}, default: []
     field :host_intro, :string
     field :host_correct, :string
     field :host_wrong, :string
@@ -29,7 +30,7 @@ defmodule BotArmyTerrain.Schemas.Lesson do
 
   def changeset(lesson, attrs) do
     lesson
-    |> cast(attrs, [:chunk_id, :track_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :host_intro, :host_correct, :host_wrong, :npc_players])
+    |> cast(attrs, [:chunk_id, :track_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :quiz_questions, :host_intro, :host_correct, :host_wrong, :npc_players])
     |> validate_required([:chunk_id, :title, :explanation, :generated_at])
     |> unique_constraint(:chunk_id)
   end

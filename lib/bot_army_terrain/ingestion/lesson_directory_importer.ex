@@ -183,6 +183,8 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
               %{}
           end
 
+        quiz_payload = normalize_quiz_payload(data, difficulty)
+
         attrs = %{
           track_id: track.id,
           chunk_id: generate_chunk_id(lesson_path),
@@ -190,9 +192,10 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
           explanation: Map.get(data, "content", Map.get(data, "explanation", "")),
           external_link: Map.get(data, "external_link"),
           difficulty: difficulty,
-          quiz_question: Map.get(data, "quiz_question"),
-          quiz_options: Map.get(data, "quiz_options", []),
-          quiz_correct_index: Map.get(data, "quiz_correct_index"),
+          quiz_question: quiz_payload.quiz_question,
+          quiz_options: quiz_payload.quiz_options,
+          quiz_correct_index: quiz_payload.quiz_correct_index,
+          quiz_questions: quiz_payload.quiz_questions,
           host_intro: Map.get(data, "host_intro"),
           host_correct: Map.get(data, "host_correct"),
           host_wrong: Map.get(data, "host_wrong"),
@@ -217,4 +220,77 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
     # Generate a deterministic ID based on file path
     :crypto.hash(:sha256, lesson_path) |> Base.encode16(case: :lower) |> String.slice(0, 16)
   end
+
+  defp normalize_quiz_payload(data, lesson_difficulty) do
+    quiz_questions =
+      case Map.get(data, "quiz_questions") do
+        questions when is_list(questions) and questions != [] ->
+          questions
+          |> Enum.map(&normalize_quiz_question(&1, lesson_difficulty))
+          |> Enum.reject(&is_nil/1)
+
+        _ ->
+          build_legacy_question(data, lesson_difficulty)
+      end
+
+    first = List.first(quiz_questions) || %{}
+
+    %{
+      quiz_question: Map.get(first, "question"),
+      quiz_options: Map.get(first, "options", []),
+      quiz_correct_index: Map.get(first, "correct_index"),
+      quiz_questions: quiz_questions
+    }
+  end
+
+  defp build_legacy_question(data, lesson_difficulty) do
+    question = Map.get(data, "quiz_question")
+    options = Map.get(data, "quiz_options", [])
+    correct_index = Map.get(data, "quiz_correct_index")
+
+    if is_binary(question) and is_list(options) and is_integer(correct_index) do
+      [
+        %{
+          "question" => question,
+          "options" => options,
+          "correct_index" => correct_index,
+          "difficulty" => lesson_difficulty
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp normalize_quiz_question(question, lesson_difficulty) when is_map(question) do
+    stem = Map.get(question, "question")
+    options = Map.get(question, "options", [])
+    correct_index = Map.get(question, "correct_index")
+
+    if is_binary(stem) and is_list(options) and is_integer(correct_index) do
+      %{
+        "question" => stem,
+        "options" => options,
+        "correct_index" => correct_index,
+        "difficulty" => normalize_question_difficulty(Map.get(question, "difficulty"), lesson_difficulty)
+      }
+    else
+      nil
+    end
+  end
+
+  defp normalize_quiz_question(_, _), do: nil
+
+  defp normalize_question_difficulty(value, _fallback) when is_integer(value) do
+    cond do
+      value < 1 -> 1
+      value > 3 -> 3
+      true -> value
+    end
+  end
+
+  defp normalize_question_difficulty("beginner", _fallback), do: 1
+  defp normalize_question_difficulty("intermediate", _fallback), do: 2
+  defp normalize_question_difficulty("advanced", _fallback), do: 3
+  defp normalize_question_difficulty(_, fallback), do: fallback
 end

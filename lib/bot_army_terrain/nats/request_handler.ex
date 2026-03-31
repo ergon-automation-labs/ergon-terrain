@@ -324,6 +324,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           "quiz_question" => lesson.quiz_question,
           "quiz_options" => lesson.quiz_options || [],
           "quiz_correct_index" => lesson.quiz_correct_index,
+          "quiz_questions" => lesson.quiz_questions || [],
           "host_intro" => lesson.host_intro,
           "host_correct" => lesson.host_correct,
           "host_wrong" => lesson.host_wrong,

@@ -70,7 +70,7 @@ content: |
   Can be multiple paragraphs.
   Markdown formatting is supported.
 
-# Quiz
+# Quiz (legacy single-question format, still supported)
 quiz_question: "What is the match operator in Elixir?"
 quiz_options:
   - "="          # Index 0
@@ -78,6 +78,25 @@ quiz_options:
   - "=="         # Index 2
   - "match()"    # Index 3
 quiz_correct_index: 0  # Correct answer is at index 0
+
+# Quiz (new multi-question format)
+quiz_questions:
+  - question: "What is the match operator in Elixir?"
+    options:
+      - "="
+      - ":="
+      - "=="
+      - "match()"
+    correct_index: 0
+    difficulty: "beginner"   # optional: beginner|intermediate|advanced or 1..3
+  - question: "What happens when a pattern does not match?"
+    options:
+      - "Returns nil"
+      - "Raises MatchError"
+      - "Retries automatically"
+      - "Silently coerces values"
+    correct_index: 1
+    difficulty: "intermediate"
 
 # Host dialogue (gameshow banter)
 host_intro: |
@@ -107,6 +126,12 @@ In the TUI, press `i` to open the import dialog:
    - Read `npcs.yaml` from each track
    - Import all `.yaml`/`.yml` files as lessons
    - Queue embeddings for content
+
+## Gameshow vs Dojo behavior
+
+- **Gameshow generation:** uses a varied sampled subset from lesson question pools with mixed difficulty, so regenerating yields slightly different question mixes.
+- **Dojo lesson generation:** uses the full question set for each lesson to build more complete study content.
+- To stay compatible with older consumers, importer still backfills legacy fields (`quiz_question`, `quiz_options`, `quiz_correct_index`) from the first item in `quiz_questions`.
 
 ## Example: Complete Track
 
