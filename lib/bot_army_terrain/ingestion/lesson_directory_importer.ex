@@ -217,8 +217,11 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
   end
 
   defp generate_chunk_id(lesson_path) do
-    # Generate a deterministic ID based on file path
-    :crypto.hash(:sha256, lesson_path) |> Base.encode16(case: :lower) |> String.slice(0, 16)
+    # Generate a deterministic UUID based on file path
+    # Use first 16 bytes of SHA256 hash as binary_id
+    hash = :crypto.hash(:sha256, lesson_path)
+    <<uuid_bytes::binary-size(16), _::binary>> = hash
+    uuid_bytes
   end
 
   defp normalize_quiz_payload(data, lesson_difficulty) do
