@@ -29,6 +29,7 @@ defmodule BotArmyTerrain.Application do
     |> maybe_add_game_state_store()
     |> maybe_add_game_generation_worker()
     |> maybe_add_consumer()
+    |> maybe_add_event_handler()
     |> maybe_add_request_handler()
 
     opts = [strategy: :one_for_one, name: BotArmyTerrain.Supervisor]
@@ -84,10 +85,14 @@ defmodule BotArmyTerrain.Application do
   end
 
   defp maybe_add_consumer(children) do
-    if @env == :test, do: children, else: [{BotArmyTerrain.NATS.Consumer, []} | children]
+    if @env == :test, do: children, else: [{BotArmyTerrain.TerrainBot, []} | children]
   end
 
   defp maybe_add_request_handler(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.NATS.RequestHandler, []} | children]
+  end
+
+  defp maybe_add_event_handler(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.NATS.EventHandler, []} | children]
   end
 end
