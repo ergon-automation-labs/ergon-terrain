@@ -14,7 +14,8 @@ defmodule BotArmyTerrain.TerrainBot do
     skills: [
       BotArmyTerrain.Skills.Ingest,
       BotArmyTerrain.Skills.GenerateCards,
-      BotArmyTerrain.Skills.ImportCards
+      BotArmyTerrain.Skills.ImportCards,
+      BotArmyTerrain.Skills.PopulateGraph
     ],
     bot_id: :terrain
 end

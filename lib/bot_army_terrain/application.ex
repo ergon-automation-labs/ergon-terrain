@@ -16,6 +16,7 @@ defmodule BotArmyTerrain.Application do
   @impl true
   def start(_type, _args) do
     children = []
+    |> maybe_add_graph_repo()
     |> maybe_add_repo()
     |> maybe_add_track_store()
     |> maybe_add_chunk_store()
@@ -34,6 +35,12 @@ defmodule BotArmyTerrain.Application do
 
     opts = [strategy: :one_for_one, name: BotArmyTerrain.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp maybe_add_graph_repo(children) do
+    if @env == :test or not Application.get_env(:bot_army_core, :graph_enabled, false),
+      do: children,
+      else: [BotArmyCore.GraphRepo | children]
   end
 
   defp maybe_add_repo(children) do
