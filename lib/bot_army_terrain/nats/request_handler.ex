@@ -164,36 +164,44 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         })
 
       File.dir?(resolved_path) ->
-        case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(resolved_path) do
-          {:ok, result} ->
-            Jason.encode!(%{
-              "ok" => true,
-              "tracks_imported" => result.tracks_imported,
-              "lessons_imported" => result.lessons_imported,
-              "requested_path" => path,
-              "resolved_path" => resolved_path
-            })
+        # Queue directory import asynchronously to avoid blocking RequestHandler
+        _task = Task.start(fn ->
+          case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(resolved_path) do
+            {:ok, result} ->
+              Logger.info("Track import queued: #{path} → #{result.tracks_imported} tracks, #{result.lessons_imported} lessons")
 
-          {:error, reason} ->
-            Jason.encode!(%{"ok" => false, "error" => inspect(reason)})
-        end
+            {:error, reason} ->
+              Logger.error("Track import failed: #{path} → #{inspect(reason)}")
+          end
+        end)
+
+        Jason.encode!(%{
+          "ok" => true,
+          "status" => "queued",
+          "requested_path" => path,
+          "resolved_path" => resolved_path,
+          "message" => "Track import queued for background processing"
+        })
 
       true ->
-        case BotArmyTerrain.Ingestion.YamlImporter.import_file(resolved_path) do
-          {:ok, result} ->
-            Jason.encode!(%{
-              "ok" => true,
-              "track" => result.track,
-              "track_id" => result.track_id,
-              "chunks_imported" => result.chunks_imported,
-              "chunks_updated" => result.chunks_updated,
-              "requested_path" => path,
-              "resolved_path" => resolved_path
-            })
+        # Queue file import asynchronously to avoid blocking RequestHandler
+        _task = Task.start(fn ->
+          case BotArmyTerrain.Ingestion.YamlImporter.import_file(resolved_path) do
+            {:ok, result} ->
+              Logger.info("Track import completed: #{path} → #{result.track}, #{result.chunks_imported} chunks")
 
-          {:error, reason} ->
-            Jason.encode!(%{"ok" => false, "error" => inspect(reason)})
-        end
+            {:error, reason} ->
+              Logger.error("Track import failed: #{path} → #{inspect(reason)}")
+          end
+        end)
+
+        Jason.encode!(%{
+          "ok" => true,
+          "status" => "queued",
+          "requested_path" => path,
+          "resolved_path" => resolved_path,
+          "message" => "Track import queued for background processing"
+        })
     end
   end
 
