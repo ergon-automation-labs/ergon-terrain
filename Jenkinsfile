@@ -143,7 +143,10 @@ pipeline {
           echo "Running: $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()'"
           $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate()'
 
-          echo "✓ Migrations complete"
+          echo "Running: $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate_graph()'"
+          $RELEASE_BIN eval 'BotArmyTerrain.Release.migrate_graph()'
+
+          echo "✓ All migrations complete"
         '''
       }
     }
