@@ -34,6 +34,11 @@ defmodule BotArmyTerrain.Release do
     end
   end
 
+  def migrate_graph do
+    load_app()
+    BotArmyTerrain.GraphMigrator.run()
+  end
+
   defp repos do
     Application.fetch_env!(@app, :ecto_repos)
   end
