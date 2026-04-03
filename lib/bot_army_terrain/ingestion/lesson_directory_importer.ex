@@ -96,6 +96,8 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
          {:ok, npcs} <- read_npcs(track_dir_path),
          {:ok, lesson_files} <- list_lesson_files(track_dir_path),
          {:ok, count} <- import_lessons(track, npcs, track_dir_path, lesson_files) do
+      # Update chunk_count to reflect actual number of lessons/content chunks
+      TrackStore.update_chunk_count_from_store(track.id)
       Logger.info("Terrain: imported track '#{track_name}' with #{count} lesson(s)")
       {:ok, %{track: track_name, lessons_imported: count}}
     else

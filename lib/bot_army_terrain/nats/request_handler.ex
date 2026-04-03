@@ -139,6 +139,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           "id" => track.id,
           "name" => track.name,
           "card_count" => track.card_count || 0,
+          "chunk_count" => track.chunk_count || 0,
           "cards_due" => cards_due || 0,
           "status" => track.status,
           "last_reviewed_at" => track.updated_at && DateTime.to_iso8601(track.updated_at)
