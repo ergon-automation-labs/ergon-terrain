@@ -18,7 +18,7 @@ defmodule BotArmyTerrain.Schemas.GameState do
 
   def changeset(game_state, attrs) do
     game_state
-    |> cast(attrs, [:track_id, :game_json, :dojo_json, :status, :generated_at])
+    |> cast(attrs, [:track_id, :game_json, :dojo_json, :status, :generated_at, :tenant_id, :user_id])
     |> validate_required([:track_id, :status])
     |> unique_constraint(:track_id)
   end

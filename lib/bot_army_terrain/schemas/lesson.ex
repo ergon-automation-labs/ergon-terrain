@@ -30,7 +30,7 @@ defmodule BotArmyTerrain.Schemas.Lesson do
 
   def changeset(lesson, attrs) do
     lesson
-    |> cast(attrs, [:chunk_id, :track_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :quiz_questions, :host_intro, :host_correct, :host_wrong, :npc_players])
+    |> cast(attrs, [:chunk_id, :track_id, :title, :explanation, :external_link, :difficulty, :embedding_vector, :embedded_at, :generated_at, :quiz_question, :quiz_options, :quiz_correct_index, :quiz_questions, :host_intro, :host_correct, :host_wrong, :npc_players, :tenant_id, :user_id])
     |> validate_required([:chunk_id, :title, :explanation, :generated_at])
     |> unique_constraint(:chunk_id)
   end
