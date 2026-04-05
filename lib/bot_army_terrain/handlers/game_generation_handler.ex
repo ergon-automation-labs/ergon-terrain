@@ -11,18 +11,18 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
   Generate game structure (questions, branching, difficulty, bonuses).
   Publishes prompt to llm.prompt.submit with phase="game" in source_metadata.
   """
-  def generate_game(track_id, lessons) do
+  def generate_game(tenant_id, user_id, track_id, lessons) do
     prompt = build_game_prompt(lessons)
-    publish_to_llm(track_id, "game", prompt)
+    publish_to_llm(tenant_id, user_id, track_id, "game", prompt)
   end
 
   @doc """
   Generate Dojo lessons (study guides, key concepts, practice problems).
   Publishes prompt to llm.prompt.submit with phase="dojo" in source_metadata.
   """
-  def generate_dojo(track_id, lessons) do
+  def generate_dojo(tenant_id, user_id, track_id, lessons) do
     prompt = build_dojo_prompt(lessons)
-    publish_to_llm(track_id, "dojo", prompt)
+    publish_to_llm(tenant_id, user_id, track_id, "dojo", prompt)
   end
 
   defp build_game_prompt(lessons) do
@@ -298,7 +298,7 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
   defp difficulty_label(3), do: "advanced"
   defp difficulty_label(_), do: "intermediate"
 
-  defp publish_to_llm(track_id, phase, prompt) do
+  defp publish_to_llm(tenant_id, user_id, track_id, phase, prompt) do
     case Connection.get_connection() do
       {:ok, conn} ->
         envelope = %{
@@ -309,6 +309,8 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
           "source_node" => :inet.gethostname() |> elem(1) |> to_string(),
           "triggered_by" => "game_generation_handler",
           "schema_version" => "1.0",
+          "tenant_id" => tenant_id,
+          "user_id" => user_id,
           "source_metadata" => %{
             "source_domain" => "game_generation",
             "track_id" => track_id,

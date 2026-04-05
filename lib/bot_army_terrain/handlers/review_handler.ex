@@ -23,13 +23,15 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
     - {:error, reason} on failure
   """
   def handle_submit(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+
     with {:ok, card_id} <- extract_card_id(message),
          {:ok, quality} <- extract_quality(message),
-         {:ok, card} <- fetch_card(card_id),
+         {:ok, card} <- fetch_card(tenant_id, card_id),
          {:ok, new_fields} <- apply_sm2(card, quality),
-         :ok <- persist_card(card, new_fields) do
+         :ok <- persist_card(tenant_id, card, new_fields) do
       log_review(card_id, quality, new_fields)
-      record_card_review(message)
+      record_card_review(tenant_id, user_id, message)
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -54,10 +56,10 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
     end
   end
 
-  defp fetch_card(card_id) do
+  defp fetch_card(tenant_id, card_id) do
     card_store = Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
 
-    case card_store.get_card(card_id) do
+    case card_store.get_card(tenant_id, card_id) do
       nil -> {:error, :card_not_found}
       card -> {:ok, card}
     end
@@ -67,10 +69,10 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
     {:ok, SM2.schedule(card, quality)}
   end
 
-  defp persist_card(card, new_fields) do
+  defp persist_card(tenant_id, card, new_fields) do
     card_store = Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
 
-    case card_store.update_card(card, new_fields) do
+    case card_store.update_card(tenant_id, card, new_fields) do
       {:ok, _updated_card} -> :ok
       {:error, reason} -> {:error, reason}
     end
@@ -83,7 +85,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
     )
   end
 
-  defp record_card_review(message) do
+  defp record_card_review(tenant_id, user_id, message) do
     case message["session_id"] do
       nil ->
         :ok
@@ -91,7 +93,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
       session_id ->
         store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
 
-        case store.record_card_review(message) do
+        case store.record_card_review(tenant_id, user_id, message) do
           :ok ->
             :ok
 

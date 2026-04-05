@@ -163,7 +163,8 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
     # Returns {:ok, :submitted} if LLM request succeeded
     # Returns {:ok, demo_lesson} if NATS unavailable (falls back to synchronous demo)
     # Returns {:error, reason} on submission failure
-    case LessonHandler.generate_lesson(chunk_id, chunk_title, chunk_content) do
+    default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+    case LessonHandler.generate_lesson(default_tenant_id, chunk_id, chunk_title, chunk_content) do
       {:ok, :submitted} ->
         # LLM request submitted successfully — completion event fires async
         {:ok, :submitted}

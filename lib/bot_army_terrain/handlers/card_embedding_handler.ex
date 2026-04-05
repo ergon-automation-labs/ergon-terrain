@@ -11,11 +11,12 @@ defmodule BotArmyTerrain.Handlers.CardEmbeddingHandler do
 
   @doc "Handle embedding created event from LLM bot."
   def handle_embedding(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
     payload = message["payload"]
 
     case extract_embedding_data(payload) do
       {:ok, card_id, embedding} ->
-        update_card_embedding(card_id, embedding)
+        update_card_embedding(tenant_id, user_id, card_id, embedding)
 
       {:error, reason} ->
         Logger.warning("Invalid embedding data: #{inspect(reason)}")
@@ -38,8 +39,8 @@ defmodule BotArmyTerrain.Handlers.CardEmbeddingHandler do
     {:error, :invalid_payload}
   end
 
-  defp update_card_embedding(card_id, embedding) do
-    case CardStore.get_card(card_id) do
+  defp update_card_embedding(tenant_id, user_id, card_id, embedding) do
+    case CardStore.get_card(tenant_id, card_id) do
       nil ->
         Logger.warning("Card #{card_id} not found for embedding update")
         :ok
@@ -47,7 +48,7 @@ defmodule BotArmyTerrain.Handlers.CardEmbeddingHandler do
       card ->
         vector = Pgvector.new(embedding)
 
-        case CardStore.update_card(card, %{
+        case CardStore.update_card(tenant_id, card, %{
           embedding_vector: vector,
           embedded_at: DateTime.utc_now()
         }) do

@@ -16,8 +16,9 @@ defmodule BotArmyTerrain.LessonStore do
 
   # Public API — bypass GenServer inbox, query Repo directly
 
-  @doc "Store or update a lesson. Upserts by chunk_id."
-  def store_lesson(attrs) do
+  @doc "Store or update a lesson. Upserts by chunk_id, scoped to tenant."
+  def store_lesson(tenant_id, attrs) do
+    attrs = Map.put(attrs, "tenant_id", tenant_id)
     %Lesson{}
     |> Lesson.changeset(attrs)
     |> Repo.insert(
@@ -26,33 +27,40 @@ defmodule BotArmyTerrain.LessonStore do
     )
   end
 
-  @doc "Get a lesson by chunk_id."
-  def get_lesson_by_chunk(chunk_id) do
-    Repo.get_by(Lesson, chunk_id: chunk_id)
+  @doc "Get a lesson by chunk_id, scoped to tenant."
+  def get_lesson_by_chunk(tenant_id, chunk_id) do
+    case Repo.get_by(Lesson, chunk_id: chunk_id) do
+      nil -> nil
+      lesson -> if lesson.tenant_id == tenant_id, do: lesson, else: nil
+    end
   end
 
-  @doc "List all lessons, ordered by insertion time."
-  def list_lessons do
-    Repo.all(from l in Lesson, order_by: [asc: l.inserted_at])
+  @doc "List all lessons, ordered by insertion time, scoped to tenant."
+  def list_lessons(tenant_id) do
+    Repo.all(from l in Lesson, where: l.tenant_id == ^tenant_id, order_by: [asc: l.inserted_at])
   end
 
-  @doc "List all lessons for a track, ordered by insertion time."
-  def list_lessons_by_track(track_id) do
-    Repo.all(from l in Lesson, where: l.track_id == ^track_id, order_by: [asc: l.inserted_at])
+  @doc "List all lessons for a track, ordered by insertion time, scoped to tenant."
+  def list_lessons_by_track(tenant_id, track_id) do
+    Repo.all(from l in Lesson, where: l.tenant_id == ^tenant_id and l.track_id == ^track_id, order_by: [asc: l.inserted_at])
   end
 
-  @doc "Update a lesson."
-  def update_lesson(lesson, attrs) do
-    lesson
-    |> Lesson.changeset(attrs)
-    |> Repo.update()
+  @doc "Update a lesson, scoped to tenant."
+  def update_lesson(tenant_id, lesson, attrs) do
+    if lesson.tenant_id == tenant_id do
+      lesson
+      |> Lesson.changeset(attrs)
+      |> Repo.update()
+    else
+      {:error, :unauthorized}
+    end
   end
 
-  @doc "Find similar lessons using pgvector cosine distance."
-  def find_similar_lessons(embedding_vector, limit \\ 5) do
+  @doc "Find similar lessons using pgvector cosine distance, scoped to tenant."
+  def find_similar_lessons(tenant_id, embedding_vector, limit \\ 5) do
     Repo.all(
       from l in Lesson,
-      where: not is_nil(l.embedding_vector),
+      where: l.tenant_id == ^tenant_id and not is_nil(l.embedding_vector),
       order_by: fragment("embedding_vector <=> ?", ^embedding_vector),
       limit: ^limit,
       select: %{

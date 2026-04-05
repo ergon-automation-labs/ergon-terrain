@@ -19,14 +19,14 @@ defmodule BotArmyTerrain.EmbedWorker do
 
   @impl true
   @doc "Queue a card for embedding generation (fire-and-forget)."
-  def queue_card(card_id) do
-    GenServer.cast(__MODULE__, {:embed_card, card_id})
+  def queue_card(tenant_id, card_id) do
+    GenServer.cast(__MODULE__, {:embed_card, tenant_id, card_id})
   end
 
   @impl true
   @doc "Queue a chunk for embedding generation (fire-and-forget)."
-  def queue_chunk(chunk_id) do
-    GenServer.cast(__MODULE__, {:embed_chunk, chunk_id})
+  def queue_chunk(tenant_id, chunk_id) do
+    GenServer.cast(__MODULE__, {:embed_chunk, tenant_id, chunk_id})
   end
 
   @impl true
@@ -35,8 +35,8 @@ defmodule BotArmyTerrain.EmbedWorker do
   end
 
   @impl true
-  def handle_cast({:embed_card, card_id}, state) do
-    case CardStore.get_card(card_id) do
+  def handle_cast({:embed_card, tenant_id, card_id}, state) do
+    case CardStore.get_card(tenant_id, card_id) do
       nil ->
         Logger.warning("Card #{card_id} not found for embedding")
         {:noreply, state}
@@ -54,10 +54,10 @@ defmodule BotArmyTerrain.EmbedWorker do
     end
   end
 
-  def handle_cast({:embed_chunk, chunk_id}, state) do
+  def handle_cast({:embed_chunk, tenant_id, chunk_id}, state) do
     alias BotArmyTerrain.ChunkStore
 
-    case ChunkStore.get(chunk_id) do
+    case ChunkStore.get(tenant_id, chunk_id) do
       nil ->
         Logger.warning("Chunk #{chunk_id} not found for embedding")
         {:noreply, state}

@@ -11,10 +11,14 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
   alias BotArmyTerrain.Handlers.GameGenerationHandler
   alias BotArmyRuntime.NATS.Connection
 
-  def handle_completion(payload) do
-    track_id = payload["source_metadata"]["track_id"]
-    phase = payload["source_metadata"]["phase"]
-    completion_text = payload["payload"]["completion"]
+  def handle_completion(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    payload = message["payload"] || %{}
+    source_metadata = message["source_metadata"] || %{}
+
+    track_id = source_metadata["track_id"]
+    phase = source_metadata["phase"]
+    completion_text = payload["completion"]
 
     Logger.info("Terrain: game completion event for track #{track_id}, phase #{phase}")
 
@@ -23,56 +27,56 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
 
     case {phase, Jason.decode(json_text)} do
       {"game", {:ok, game_json}} ->
-        handle_game_phase_complete(track_id, game_json)
+        handle_game_phase_complete(tenant_id, user_id, track_id, game_json)
 
       {"dojo", {:ok, dojo_json}} ->
-        handle_dojo_phase_complete(track_id, dojo_json)
+        handle_dojo_phase_complete(tenant_id, user_id, track_id, dojo_json)
 
       {phase, {:error, decode_error}} ->
         Logger.error(
           "Terrain: failed to parse LLM JSON for track #{track_id}, phase #{phase}: #{inspect(decode_error)}"
         )
 
-        GameStateStore.mark_status(track_id, "stale")
-        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => phase})
+        GameStateStore.mark_status(tenant_id, track_id, "stale")
+        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => phase, "tenant_id" => tenant_id, "user_id" => user_id})
         {:error, decode_error}
     end
   end
 
-  defp handle_game_phase_complete(track_id, _game_json_data) do
+  defp handle_game_phase_complete(tenant_id, user_id, track_id, _game_json_data) do
     Logger.info("Terrain: game phase complete for track #{track_id}, starting dojo phase")
 
     # Store the game JSON
-    GameStateStore.upsert(%{
+    GameStateStore.upsert(tenant_id, %{
       track_id: track_id,
       game_json: Jason.encode!(_game_json_data),
       status: "generating_dojo"
     })
 
     # Trigger dojo generation
-    lessons = LessonStore.list_lessons_by_track(track_id)
-    GameGenerationHandler.generate_dojo(track_id, lessons)
+    lessons = LessonStore.list_lessons_by_track(tenant_id, track_id)
+    GameGenerationHandler.generate_dojo(tenant_id, user_id, track_id, lessons)
 
-    emit_event("terrain.game.generation.progress", %{"track_id" => track_id, "phase" => "dojo"})
+    emit_event("terrain.game.generation.progress", %{"track_id" => track_id, "phase" => "dojo", "tenant_id" => tenant_id, "user_id" => user_id})
   end
 
-  defp handle_dojo_phase_complete(track_id, _dojo_json_data) do
+  defp handle_dojo_phase_complete(tenant_id, user_id, track_id, _dojo_json_data) do
     Logger.info("Terrain: dojo phase complete for track #{track_id}")
 
     # Store the dojo JSON and mark as active
-    case GameStateStore.upsert(%{
+    case GameStateStore.upsert(tenant_id, %{
            track_id: track_id,
            dojo_json: Jason.encode!(_dojo_json_data),
            status: "active",
            generated_at: DateTime.utc_now(:microsecond)
          }) do
       {:ok, _} ->
-        emit_event("terrain.game.generation.completed", %{"track_id" => track_id})
+        emit_event("terrain.game.generation.completed", %{"track_id" => track_id, "tenant_id" => tenant_id, "user_id" => user_id})
         Logger.info("Terrain: game generation completed for track #{track_id}")
 
       {:error, reason} ->
         Logger.error("Terrain: failed to store dojo state for track #{track_id}: #{inspect(reason)}")
-        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => "dojo"})
+        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => "dojo", "tenant_id" => tenant_id, "user_id" => user_id})
     end
   end
 
@@ -84,6 +88,9 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
   end
 
   defp emit_event(event_name, payload) do
+    tenant_id = payload["tenant_id"]
+    user_id = payload["user_id"]
+
     case Connection.get_connection() do
       {:ok, conn} ->
         envelope = %{
@@ -93,6 +100,8 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
           "source" => "bot_army_terrain",
           "source_node" => :inet.gethostname() |> elem(1) |> to_string(),
           "schema_version" => "1.0",
+          "tenant_id" => tenant_id,
+          "user_id" => user_id,
           "payload" => payload
         }
 

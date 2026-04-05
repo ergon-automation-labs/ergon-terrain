@@ -66,15 +66,16 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
 
   # Import all cards for a single track
   defp import_track(track_name, track_rows) do
+    default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
     with {:ok, track} <- track_store().get_or_create_track_by_name(track_name),
-         {success_count, error_count} <- create_cards_for_track(track.id, track_rows) do
+         {success_count, error_count} <- create_cards_for_track(default_tenant_id, track.id, track_rows) do
       if error_count > 0 do
         Logger.warning(
           "Track '#{track_name}': #{success_count} cards created, #{error_count} failed"
         )
       end
 
-      track_store().update_card_count_from_store(track.id)
+      track_store().update_card_count_from_store(default_tenant_id, track.id)
       {:ok, {track, success_count}}
     else
       {:error, reason} -> {:error, reason}
@@ -82,7 +83,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
   end
 
   # Create cards for a track, return {success_count, error_count}
-  defp create_cards_for_track(track_id, rows) do
+  defp create_cards_for_track(tenant_id, track_id, rows) do
     results =
       rows
       |> Enum.map(fn row ->
@@ -94,9 +95,9 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
           generation_model: nil
         }
 
-        case card_store().create_card(attrs) do
+        case card_store().create_card(tenant_id, attrs) do
           {:ok, card} ->
-            embed_worker().queue_card(card.id)
+            embed_worker().queue_card(tenant_id, card.id)
             :ok
 
           {:error, reason} ->

@@ -16,8 +16,8 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
   If NATS unavailable, falls back to demo lesson synchronously.
   Actual lesson data arrives asynchronously via LessonCompletionHandler.
   """
-  def generate_lesson(chunk_id, chunk_title, chunk_content) do
-    case submit_llm_request(chunk_id, chunk_title, chunk_content) do
+  def generate_lesson(tenant_id, chunk_id, chunk_title, chunk_content) do
+    case submit_llm_request(tenant_id, nil, chunk_id, chunk_title, chunk_content) do
       :ok ->
         # LLM request submitted — lesson data will arrive asynchronously
         {:ok, :submitted}
@@ -39,7 +39,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
   Publishes to "llm.prompt.submit" with proper envelope and payload fields.
   Does NOT wait for response — completion handled async by LessonCompletionHandler.
   """
-  def submit_llm_request(chunk_id, chunk_title, chunk_content) do
+  def submit_llm_request(tenant_id, user_id, chunk_id, chunk_title, chunk_content) do
     prompt = build_lesson_prompt(chunk_title, chunk_content)
     prompt_id = UUID.uuid4() |> to_string()
 
@@ -51,6 +51,8 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
       "source_node" => get_node_name(),
       "triggered_by" => "lesson_handler",
       "schema_version" => "1.0",
+      "tenant_id" => tenant_id,
+      "user_id" => user_id,
       "source_metadata" => %{
         "source_domain" => "lesson_generation",
         "chunk_id" => chunk_id

@@ -87,10 +87,11 @@ defmodule BotArmyTerrain.GameGenerationWorker do
     with {:ok, track} <- get_track(track_id),
          {:ok, lessons} <- get_lessons(track_id) do
       unless Enum.empty?(lessons) do
-        GameStateStore.mark_status(track_id, "generating_game")
+        default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+        GameStateStore.mark_status(default_tenant_id, track_id, "generating_game")
         emit_event("terrain.game.generation.started", %{"track_id" => track_id})
 
-        GameGenerationHandler.generate_game(track_id, lessons)
+        GameGenerationHandler.generate_game(default_tenant_id, nil, track_id, lessons)
       end
 
       :ok

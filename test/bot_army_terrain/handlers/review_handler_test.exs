@@ -8,6 +8,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
   describe "handle_submit/1" do
     test "valid quality 4: updates card with SM-2 fields" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -20,15 +21,19 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
         "quality" => 4,
         "track_id" => "track-456",
         "session_id" => "session-789",
-        "elapsed_ms" => 3000
+        "elapsed_ms" => 3000,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn id ->
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn t_id, id ->
+        assert t_id == tenant_id
         assert id == "card-123"
         card
       end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn updated_card, attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn t_id, updated_card, attrs ->
+        assert t_id == tenant_id
         assert updated_card.id == "card-123"
         assert attrs.state == "learning"
         assert attrs.interval_days == 1
@@ -37,7 +42,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
         {:ok, updated_card}
       end)
 
-      expect(BotArmyTerrain.ReviewSessionStoreMock, :record_card_review, fn _msg ->
+      expect(BotArmyTerrain.ReviewSessionStoreMock, :record_card_review, fn t_id, u_id, _msg ->
+        assert t_id == tenant_id
+        assert u_id == nil
         :ok
       end)
 
@@ -45,6 +52,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 5 (perfect): increases interval and ease factor" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -54,12 +62,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-123",
-        "quality" => 5
+        "quality" => 5,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, attrs ->
         assert attrs.repetitions == 2
         assert attrs.interval_days == 3
         assert attrs.ease_factor > 2.5
@@ -70,6 +80,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 0 (fail): resets card to learning" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-456",
         ease_factor: 2.5,
@@ -79,12 +90,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-456",
-        "quality" => 0
+        "quality" => 0,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, attrs ->
         assert attrs.repetitions == 0
         assert attrs.interval_days == 1
         assert attrs.state == "learning"
@@ -96,6 +109,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 3 (pass): increments repetitions" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-789",
         ease_factor: 2.5,
@@ -105,12 +119,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-789",
-        "quality" => 3
+        "quality" => 3,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, attrs ->
         assert attrs.repetitions == 1
         assert attrs.state == "learning"
         {:ok, card}
@@ -121,7 +137,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "missing card_id: returns error" do
       message = %{
-        "quality" => 4
+        "quality" => 4,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :missing_card_id} = ReviewHandler.handle_submit(message)
@@ -129,7 +147,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "missing quality: returns error" do
       message = %{
-        "card_id" => "card-123"
+        "card_id" => "card-123",
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :missing_quality} = ReviewHandler.handle_submit(message)
@@ -138,7 +158,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "invalid quality (6): returns error" do
       message = %{
         "card_id" => "card-123",
-        "quality" => 6
+        "quality" => 6,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :invalid_quality} = ReviewHandler.handle_submit(message)
@@ -147,7 +169,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "invalid quality (-1): returns error" do
       message = %{
         "card_id" => "card-123",
-        "quality" => -1
+        "quality" => -1,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :invalid_quality} = ReviewHandler.handle_submit(message)
@@ -156,7 +180,9 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "invalid quality (nil): returns missing_quality error" do
       message = %{
         "card_id" => "card-123",
-        "quality" => nil
+        "quality" => nil,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :missing_quality} = ReviewHandler.handle_submit(message)
@@ -165,24 +191,30 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "invalid quality (string): returns error" do
       message = %{
         "card_id" => "card-123",
-        "quality" => "four"
+        "quality" => "four",
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
       }
 
       assert {:error, :invalid_quality} = ReviewHandler.handle_submit(message)
     end
 
     test "card not found: returns error without calling update_card" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       message = %{
         "card_id" => "nonexistent",
-        "quality" => 4
+        "quality" => 4,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> nil end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> nil end)
 
       assert {:error, :card_not_found} = ReviewHandler.handle_submit(message)
     end
 
     test "update_card fails: returns error" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -192,12 +224,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-123",
-        "quality" => 4
+        "quality" => 4,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, _attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, _attrs ->
         {:error, :database_error}
       end)
 
@@ -205,6 +239,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "float quality value: converts to integer" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -214,12 +249,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-123",
-        "quality" => 4.5
+        "quality" => 4.5,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, attrs ->
         assert attrs.repetitions == 1
         {:ok, card}
       end)
@@ -228,6 +265,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality at boundaries: 0 works" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -237,12 +275,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-123",
-        "quality" => 0
+        "quality" => 0,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, _attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, _attrs ->
         {:ok, card}
       end)
 
@@ -250,6 +290,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality at boundaries: 5 works" do
+      tenant_id = BotArmyCore.Tenant.default_tenant_id()
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -259,12 +300,14 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       message = %{
         "card_id" => "card-123",
-        "quality" => 5
+        "quality" => 5,
+        "tenant_id" => tenant_id,
+        "user_id" => nil
       }
 
-      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _id -> card end)
+      expect(BotArmyTerrain.CardStoreMock, :get_card, fn _t_id, _id -> card end)
 
-      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _card, _attrs ->
+      expect(BotArmyTerrain.CardStoreMock, :update_card, fn _t_id, _card, _attrs ->
         {:ok, card}
       end)
 

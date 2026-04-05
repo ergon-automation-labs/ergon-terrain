@@ -31,12 +31,12 @@ defmodule BotArmyTerrain.LessonEmbedWorker do
   Fetches lesson by ID, publishes embedding request with title+explanation text,
   receives embeddings asynchronously via LessonEmbeddingHandler.
   """
-  def queue_lesson(lesson_id) do
-    GenServer.cast(__MODULE__, {:embed_lesson, lesson_id})
+  def queue_lesson(tenant_id, lesson_id) do
+    GenServer.cast(__MODULE__, {:embed_lesson, tenant_id, lesson_id})
   end
 
   @impl true
-  def handle_cast({:embed_lesson, lesson_id}, state) do
+  def handle_cast({:embed_lesson, tenant_id, lesson_id}, state) do
     case Repo.get(Lesson, lesson_id) do
       nil ->
         Logger.warning("Lesson #{lesson_id} not found for embedding")

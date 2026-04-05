@@ -10,6 +10,7 @@ defmodule BotArmyTerrain.Handlers.LessonEmbeddingHandler do
   alias BotArmyTerrain.{LessonStore, Repo, Schemas.Lesson}
 
   def handle_embedding(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
     payload = message["payload"] || %{}
     lesson_id = payload["lesson_id"]
     embedding = payload["embedding"]
@@ -22,7 +23,7 @@ defmodule BotArmyTerrain.Handlers.LessonEmbeddingHandler do
         lesson ->
           vector = Pgvector.new(embedding)
 
-          case LessonStore.update_lesson(lesson, %{
+          case LessonStore.update_lesson(tenant_id, lesson, %{
                  embedding_vector: vector,
                  embedded_at: DateTime.utc_now()
                }) do

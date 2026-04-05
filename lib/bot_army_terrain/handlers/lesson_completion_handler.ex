@@ -25,6 +25,7 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
     }
   """
   def handle_completion(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
     payload = message["payload"] || %{}
     source_metadata = message["source_metadata"] || %{}
 
@@ -46,10 +47,10 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
           "generated_at" => DateTime.utc_now()
         })
 
-      case BotArmyTerrain.LessonStore.store_lesson(attrs) do
+      case BotArmyTerrain.LessonStore.store_lesson(tenant_id, attrs) do
         {:ok, lesson} ->
-          BotArmyTerrain.LessonEmbedWorker.queue_lesson(lesson.id)
-          emit_completed_event(chunk_id, lesson)
+          BotArmyTerrain.LessonEmbedWorker.queue_lesson(tenant_id, lesson.id)
+          emit_completed_event(tenant_id, user_id, chunk_id, lesson)
           :ok
 
         {:error, reason} ->
@@ -57,29 +58,36 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
             "LessonCompletionHandler: failed to store lesson for #{chunk_id}: #{inspect(reason)}"
           )
 
-          emit_failed_event(chunk_id, reason)
+          emit_failed_event(tenant_id, user_id, chunk_id, reason)
           :error
       end
     end
   end
 
-  defp emit_completed_event(chunk_id, lesson) do
+  defp emit_completed_event(tenant_id, user_id, chunk_id, lesson) do
     emit_event("terrain.lesson.generation.completed", %{
       "chunk_id" => chunk_id,
       "lesson_id" => lesson.id,
-      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "tenant_id" => tenant_id,
+      "user_id" => user_id
     })
   end
 
-  defp emit_failed_event(chunk_id, reason) do
+  defp emit_failed_event(tenant_id, user_id, chunk_id, reason) do
     emit_event("terrain.lesson.generation.failed", %{
       "chunk_id" => chunk_id,
       "reason" => inspect(reason),
-      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+      "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "tenant_id" => tenant_id,
+      "user_id" => user_id
     })
   end
 
   defp emit_event(event_name, payload) do
+    tenant_id = payload["tenant_id"]
+    user_id = payload["user_id"]
+
     envelope = %{
       "event" => event_name,
       "event_id" => UUID.uuid4() |> to_string(),
@@ -87,6 +95,8 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
       "source" => "bot_army_terrain",
       "triggered_by" => "lesson_completion_handler",
       "schema_version" => "1.0",
+      "tenant_id" => tenant_id,
+      "user_id" => user_id,
       "payload" => payload
     }
 

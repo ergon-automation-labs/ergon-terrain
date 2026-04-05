@@ -17,12 +17,13 @@ defmodule BotArmyTerrain.ReviewSessionStore do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc "Create a new review session for a track."
-  def create_session(attrs) do
+  @doc "Create a new review session for a track, scoped to tenant."
+  def create_session(tenant_id, attrs) do
     attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
     %ReviewSession{}
     |> ReviewSession.changeset(%{
+      tenant_id: tenant_id,
       track_id: attrs["track_id"],
       started_at: DateTime.utc_now(),
       state: "active"
@@ -30,29 +31,34 @@ defmodule BotArmyTerrain.ReviewSessionStore do
     |> Repo.insert()
   end
 
-  @doc "End a review session, marking it complete with ended_at timestamp."
-  def end_session(session_id) do
+  @doc "End a review session, marking it complete with ended_at timestamp, scoped to tenant."
+  def end_session(tenant_id, session_id) do
     case Repo.get(ReviewSession, session_id) do
       nil ->
         {:error, :not_found}
 
       session ->
-        session
-        |> ReviewSession.changeset(%{
-          state: "complete",
-          ended_at: DateTime.utc_now()
-        })
-        |> Repo.update()
+        if session.tenant_id == tenant_id do
+          session
+          |> ReviewSession.changeset(%{
+            state: "complete",
+            ended_at: DateTime.utc_now()
+          })
+          |> Repo.update()
+        else
+          {:error, :unauthorized}
+        end
     end
   end
 
-  @doc "Record a card review and update session counters."
-  def record_card_review(attrs) do
+  @doc "Record a card review and update session counters, scoped to tenant."
+  def record_card_review(tenant_id, user_id, attrs) do
     attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
     with {:ok, session_id} <- extract_session_id(attrs),
+         {:ok, session} <- verify_session_tenant(session_id, tenant_id),
          {:ok, quality} <- extract_quality(attrs),
-         {:ok, _card_review} <- insert_card_review(attrs),
+         {:ok, _card_review} <- insert_card_review(tenant_id, attrs),
          :ok <- update_session_counters(session_id, quality) do
       :ok
     else
@@ -60,24 +66,28 @@ defmodule BotArmyTerrain.ReviewSessionStore do
     end
   end
 
-  @doc "Get session statistics by session ID."
-  def get_session_stats(session_id) do
+  @doc "Get session statistics by session ID, scoped to tenant."
+  def get_session_stats(tenant_id, session_id) do
     case Repo.get(ReviewSession, session_id) do
       nil ->
         {:error, :not_found}
 
       session ->
-        duration_ms = compute_duration_ms(session)
-        accuracy = compute_accuracy(session.cards_reviewed, session.cards_correct)
+        if session.tenant_id == tenant_id do
+          duration_ms = compute_duration_ms(session)
+          accuracy = compute_accuracy(session.cards_reviewed, session.cards_correct)
 
-        {:ok,
-         %{
-           cards_reviewed: session.cards_reviewed,
-           cards_correct: session.cards_correct,
-           accuracy: accuracy,
-           duration_ms: duration_ms,
-           state: session.state
-         }}
+          {:ok,
+           %{
+             cards_reviewed: session.cards_reviewed,
+             cards_correct: session.cards_correct,
+             accuracy: accuracy,
+             duration_ms: duration_ms,
+             state: session.state
+           }}
+        else
+          {:error, :unauthorized}
+        end
     end
   end
 
@@ -105,9 +115,17 @@ defmodule BotArmyTerrain.ReviewSessionStore do
     end
   end
 
-  defp insert_card_review(attrs) do
+  defp verify_session_tenant(session_id, tenant_id) do
+    case Repo.get(ReviewSession, session_id) do
+      nil -> {:error, :not_found}
+      session -> if session.tenant_id == tenant_id, do: {:ok, session}, else: {:error, :unauthorized}
+    end
+  end
+
+  defp insert_card_review(tenant_id, attrs) do
     %ReviewSessionCard{}
     |> ReviewSessionCard.changeset(%{
+      tenant_id: tenant_id,
       session_id: attrs["session_id"],
       card_id: attrs["card_id"],
       quality: attrs["quality"],

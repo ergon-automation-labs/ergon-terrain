@@ -14,12 +14,13 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
 
   @doc "Handle a parsed LLM response message."
   def handle_parsed(message) do
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
     payload = message["payload"] || message
 
     # Check if this is a terrain card generation response
     case payload["metadata"] do
       %{"source" => "terrain_card_generation"} ->
-        process_cards(payload)
+        process_cards(tenant_id, user_id, payload)
 
       _ ->
         Logger.debug("Ignoring LLM response (not terrain_card_generation)")
@@ -28,7 +29,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
   end
 
   # Process cards from the LLM response
-  defp process_cards(payload) do
+  defp process_cards(tenant_id, user_id, payload) do
     track_id = payload["metadata"]["track_id"]
     chunk_ids = payload["metadata"]["chunk_ids"] || []
     chunk_id = List.first(chunk_ids)
@@ -36,8 +37,8 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
 
     case extract_cards(payload) do
       {:ok, cards} ->
-        success_count = create_cards_for_track(track_id, chunk_id, cards, model)
-        track_store().update_card_count_from_store(track_id)
+        success_count = create_cards_for_track(tenant_id, track_id, chunk_id, cards, model)
+        track_store().update_card_count_from_store(tenant_id, track_id)
         Logger.info("Created #{success_count} cards from LLM response for track #{track_id}")
         :ok
 
@@ -59,10 +60,10 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
   end
 
   # Create cards for a track, return success count
-  defp create_cards_for_track(track_id, chunk_id, cards, model) do
+  defp create_cards_for_track(tenant_id, track_id, chunk_id, cards, model) do
     cards
     |> Enum.map(fn card ->
-      case validate_and_create_card(track_id, chunk_id, card, model) do
+      case validate_and_create_card(tenant_id, track_id, chunk_id, card, model) do
         {:ok, _} -> 1
         {:error, reason} ->
           Logger.warning("Failed to create card: #{inspect(reason)}")
@@ -73,7 +74,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
   end
 
   # Validate and create a single card
-  defp validate_and_create_card(track_id, chunk_id, card_data, model) do
+  defp validate_and_create_card(tenant_id, track_id, chunk_id, card_data, model) do
     front = card_data["front"]
     back = card_data["back"]
     card_type = card_data["card_type"] || "basic"
@@ -95,9 +96,9 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
           generation_model: model
         }
 
-        case card_store().create_card(attrs) do
+        case card_store().create_card(tenant_id, attrs) do
           {:ok, card} ->
-            embed_worker().queue_card(card.id)
+            embed_worker().queue_card(tenant_id, card.id)
             {:ok, card}
 
           {:error, reason} ->
