@@ -10,8 +10,11 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
   alias BotArmyRuntime.NATS.Publisher
 
   # Allow mocking via Application config (for tests)
-  defp chunk_store, do: Application.get_env(:bot_army_terrain, :chunk_store, BotArmyTerrain.ChunkStore)
-  defp track_store, do: Application.get_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStore)
+  defp chunk_store,
+    do: Application.get_env(:bot_army_terrain, :chunk_store, BotArmyTerrain.ChunkStore)
+
+  defp track_store,
+    do: Application.get_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStore)
 
   @max_chunk_size 2000
 
@@ -56,8 +59,10 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
         case acc do
           [] ->
             [[word]]
+
           [current | rest] ->
             current_text = Enum.join(current)
+
             if String.length(current_text) + String.length(word) <= @max_chunk_size do
               [current ++ [word] | rest]
             else
@@ -107,7 +112,7 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
   defp build_llm_request_and_publish(track_id, chunk_id, chunk_content, model) do
     request = build_llm_request(chunk_id, track_id, chunk_content, model)
 
-    case Publisher.publish("llm.response.parse", Jason.encode!(request)) do
+    case Publisher.publish("llm.response.parse", request) do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
     end
@@ -119,7 +124,7 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
       "type" => "card_generation",
       "source_domain" => "terrain",
       "model" => model,
-      "prompt" => build_prompt(chunk_content),
+      "text" => build_prompt(chunk_content),
       "metadata" => %{
         "source" => "terrain_card_generation",
         "track_id" => track_id,
