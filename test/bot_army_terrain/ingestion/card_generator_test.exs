@@ -47,7 +47,8 @@ defmodule BotArmyTerrain.Ingestion.CardGeneratorTest do
       chunks = CardGenerator.split_into_chunks(large_text)
       # All chunks should be reasonable size
       Enum.each(chunks, fn chunk ->
-        assert String.length(chunk) <= 3000  # allow some margin for word boundaries
+        # allow some margin for word boundaries
+        assert String.length(chunk) <= 3000
       end)
     end
 
@@ -78,12 +79,12 @@ defmodule BotArmyTerrain.Ingestion.CardGeneratorTest do
       assert request["metadata"]["model"] == "haiku"
     end
 
-    test "includes content in prompt" do
+    test "includes content in text" do
       request = CardGenerator.build_llm_request("c1", "t1", "Test Content", "haiku")
 
-      assert request["prompt"] =~ "Test Content"
-      assert request["prompt"] =~ "flashcard"
-      assert request["prompt"] =~ "JSON"
+      assert request["text"] =~ "Test Content"
+      assert request["text"] =~ "flashcard"
+      assert request["text"] =~ "JSON"
     end
   end
 end
