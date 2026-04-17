@@ -56,11 +56,19 @@ defmodule BotArmyTerrain.ReviewSessionStore do
     attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
 
     with {:ok, session_id} <- extract_session_id(attrs),
-         {:ok, session} <- verify_session_tenant(session_id, tenant_id),
-         {:ok, quality} <- extract_quality(attrs),
-         {:ok, _card_review} <- insert_card_review(tenant_id, attrs),
-         :ok <- update_session_counters(session_id, quality) do
-      :ok
+         {:ok, _session} <- verify_session_tenant(session_id, tenant_id),
+         {:ok, quality} <- extract_quality(attrs) do
+      case Repo.transaction(fn ->
+             with {:ok, _card_review} <- insert_card_review(tenant_id, attrs),
+                  :ok <- update_session_counters!(session_id, quality) do
+               :ok
+             else
+               {:error, reason} -> Repo.rollback(reason)
+             end
+           end) do
+        {:ok, :ok} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
     else
       {:error, reason} -> {:error, reason}
     end
@@ -108,17 +116,27 @@ defmodule BotArmyTerrain.ReviewSessionStore do
 
   defp extract_quality(attrs) do
     case attrs["quality"] do
-      nil -> {:error, :missing_quality}
-      quality when is_integer(quality) and quality >= 0 and quality <= 5 -> {:ok, quality}
-      quality when is_float(quality) and quality >= 0.0 and quality <= 5.0 -> {:ok, trunc(quality)}
-      _ -> {:error, :invalid_quality}
+      nil ->
+        {:error, :missing_quality}
+
+      quality when is_integer(quality) and quality >= 0 and quality <= 5 ->
+        {:ok, quality}
+
+      quality when is_float(quality) and quality >= 0.0 and quality <= 5.0 ->
+        {:ok, trunc(quality)}
+
+      _ ->
+        {:error, :invalid_quality}
     end
   end
 
   defp verify_session_tenant(session_id, tenant_id) do
     case Repo.get(ReviewSession, session_id) do
-      nil -> {:error, :not_found}
-      session -> if session.tenant_id == tenant_id, do: {:ok, session}, else: {:error, :unauthorized}
+      nil ->
+        {:error, :not_found}
+
+      session ->
+        if session.tenant_id == tenant_id, do: {:ok, session}, else: {:error, :unauthorized}
     end
   end
 
@@ -157,6 +175,34 @@ defmodule BotArmyTerrain.ReviewSessionStore do
         )
 
         :ok
+    end
+  end
+
+  # Transaction-safe variant: returns error instead of raising, for use inside Repo.transaction
+  defp update_session_counters!(session_id, quality) do
+    case Repo.get(ReviewSession, session_id) do
+      nil ->
+        {:error, :session_not_found}
+
+      session ->
+        cards_correct_increment = if quality >= 3, do: 1, else: 0
+
+        case session
+             |> ReviewSession.changeset(%{
+               cards_reviewed: session.cards_reviewed + 1,
+               cards_correct: session.cards_correct + cards_correct_increment
+             })
+             |> Repo.update() do
+          {:ok, updated_session} ->
+            Logger.debug(
+              "Session #{session_id}: reviewed=#{updated_session.cards_reviewed} correct=#{updated_session.cards_correct}"
+            )
+
+            :ok
+
+          {:error, reason} ->
+            {:error, reason}
+        end
     end
   end
 

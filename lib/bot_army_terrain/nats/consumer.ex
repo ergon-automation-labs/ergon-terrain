@@ -24,25 +24,44 @@ defmodule BotArmyTerrain.NATS.Consumer do
   @impl true
   def handle_continue(:connect, state) do
     case get_connection() do
-      {:ok, conn} -> subscribe(conn, state)
-      {:error, _} -> schedule_reconnect(state)
+      {:ok, conn} ->
+        BotArmyRuntime.NATS.Connection.subscribe_to_status()
+        subscribe(conn, state)
+
+      {:error, _} ->
+        schedule_reconnect(state)
     end
   end
 
   @impl true
-  def handle_info({:msg, %{topic: topic, body: body}}, state) do
-    Logger.debug("Terrain received NATS: #{topic}")
+  def handle_info({:msg, %{topic: topic, body: body} = msg}, state) do
+    BotArmyRuntime.Tracing.with_consumer_span(topic, msg.headers, fn ->
+      Logger.debug("Terrain received NATS: #{topic}")
 
-    case decode(body) do
-      {:ok, msg} -> handle_command(topic, msg)
-      {:error, reason} -> Logger.warning("Terrain decode failed: #{inspect(reason)}")
-    end
+      case decode(body) do
+        {:ok, decoded} -> handle_command(topic, decoded)
+        {:error, reason} -> Logger.warning("Terrain decode failed: #{inspect(reason)}")
+      end
+    end)
 
     {:noreply, state}
   end
 
   @impl true
   def handle_info(:connect_retry, state) do
+    {:noreply, state, {:continue, :connect}}
+  end
+
+  @impl true
+  def handle_info({:nats, :disconnected}, state) do
+    Logger.warning("Terrain disconnected from NATS, will reconnect")
+    Process.send_after(self(), :connect_retry, @reconnect_delay_ms)
+    {:noreply, %{state | subscriptions: []}}
+  end
+
+  @impl true
+  def handle_info({:nats, :connected}, state) do
+    Logger.info("Terrain reconnected to NATS, re-subscribing")
     {:noreply, state, {:continue, :connect}}
   end
 

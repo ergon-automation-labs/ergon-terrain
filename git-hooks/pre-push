@@ -5,6 +5,8 @@
 
 set -e
 
+MIX_BIN="/Users/abby/.local/share/mise/shims/mix"
+
 # Add mise-managed binaries to PATH
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 
@@ -19,7 +21,7 @@ if [[ $remote_ref == "refs/heads/main" ]]; then
 
   # Ensure dependencies are up to date
   echo "📦 Installing dependencies..."
-  mix deps.get || {
+  $MIX_BIN deps.get || {
     echo "❌ Failed to install dependencies"
     exit 1
   }
@@ -27,7 +29,7 @@ if [[ $remote_ref == "refs/heads/main" ]]; then
   # Check for compilation issues (quick validation)
   echo ""
   echo "🔨 Compiling code..."
-  mix compile --force || {
+  $MIX_BIN compile --force || {
     echo "❌ Compilation failed - push aborted"
     exit 1
   }
@@ -35,14 +37,14 @@ if [[ $remote_ref == "refs/heads/main" ]]; then
   # Quick linting check (non-blocking)
   echo ""
   echo "📝 Running linter..."
-  mix credo --strict || {
+  $MIX_BIN credo --strict || {
     echo "⚠️  Linting issues found (non-blocking, will fail in CI)"
   }
 
   # Run tests (required before release)
   echo ""
   echo "🧪 Running tests..."
-  mix test || {
+  $MIX_BIN test || {
     echo "❌ Tests failed - push aborted"
     exit 1
   }
@@ -50,7 +52,7 @@ if [[ $remote_ref == "refs/heads/main" ]]; then
   # Build OTP release
   echo ""
   echo "📦 Building OTP release..."
-  MIX_ENV=prod mix release --overwrite || {
+  MIX_ENV=prod $MIX_BIN release --overwrite || {
     echo "❌ Release build failed - push aborted"
     exit 1
   }
