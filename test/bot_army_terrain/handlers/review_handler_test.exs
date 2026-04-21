@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
   use ExUnit.Case
+  @moduletag :handlers
   import Mox
 
   alias BotArmyTerrain.Handlers.ReviewHandler
@@ -9,6 +10,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
   describe "handle_submit/1" do
     test "valid quality 4: updates card with SM-2 fields" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -44,7 +46,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
       expect(BotArmyTerrain.ReviewSessionStoreMock, :record_card_review, fn t_id, u_id, _msg ->
         assert t_id == tenant_id
-        assert u_id == nil
+        assert u_id == "00000000-0000-0000-0000-000000000002"
         :ok
       end)
 
@@ -53,6 +55,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "quality 5 (perfect): increases interval and ease factor" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -81,6 +84,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "quality 0 (fail): resets card to learning" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-456",
         ease_factor: 2.5,
@@ -110,6 +114,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "quality 3 (pass): increments repetitions" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-789",
         ease_factor: 2.5,
@@ -201,6 +206,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "card not found: returns error without calling update_card" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "card_id" => "nonexistent",
         "quality" => 4,
@@ -215,6 +221,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "update_card fails: returns error" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -240,6 +247,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "float quality value: converts to integer" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -266,6 +274,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "quality at boundaries: 0 works" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
@@ -291,6 +300,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
     test "quality at boundaries: 5 works" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       card = %{
         id: "card-123",
         ease_factor: 2.5,
