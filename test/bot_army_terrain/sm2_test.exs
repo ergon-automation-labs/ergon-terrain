@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.SM2Test do
   use ExUnit.Case
+  @moduletag :core
 
   alias BotArmyTerrain.SM2
 

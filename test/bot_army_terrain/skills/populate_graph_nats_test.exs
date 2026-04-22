@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.Skills.PopulateGraphNATSTest do
   use ExUnit.Case
+  @moduletag :skills
 
   @moduledoc """
   Real NATS integration test for PopulateGraph skill.
@@ -73,25 +74,25 @@ defmodule BotArmyTerrain.Skills.PopulateGraphNATSTest do
 
       # Invalid input - missing topic_id
       assert match?(
-        {:error, _},
-        skill.validate(%{"topic_name" => "Test Topic"})
-      )
+               {:error, _},
+               skill.validate(%{"topic_name" => "Test Topic"})
+             )
 
       # Invalid input - missing content and topic_name
       assert match?(
-        {:error, _},
-        skill.validate(%{"topic_id" => "test-123"})
-      )
+               {:error, _},
+               skill.validate(%{"topic_id" => "test-123"})
+             )
 
       # Invalid input - empty content
       assert match?(
-        {:error, _},
-        skill.validate(%{
-          "topic_id" => "test-123",
-          "topic_name" => "",
-          "content" => ""
-        })
-      )
+               {:error, _},
+               skill.validate(%{
+                 "topic_id" => "test-123",
+                 "topic_name" => "",
+                 "content" => ""
+               })
+             )
     end
 
     test "skill name and description are correct", %{nats_ready: true} do

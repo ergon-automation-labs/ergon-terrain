@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
   use ExUnit.Case
+  @moduletag :handlers
   import Mox
 
   alias BotArmyTerrain.Handlers.LlmResponseHandler
@@ -9,6 +10,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
   describe "handle_parsed" do
     test "ignores response with wrong source" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -24,6 +26,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
     test "ignores response with no metadata" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -37,6 +40,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
     test "handles valid terrain_card_generation response" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -63,10 +67,12 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         assert t_id == tenant_id
         {:ok, %{id: "card-123"}}
       end)
+
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn t_id, _track_id ->
         assert t_id == tenant_id
         {:ok, %{}}
       end)
+
       expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn t_id, _card_id ->
         assert t_id == tenant_id
         :ok
@@ -78,6 +84,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
     test "handles response with card_type defaults to basic if missing" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -104,10 +111,12 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         assert attrs[:card_type] == "basic"
         {:ok, %{id: "card-123"}}
       end)
+
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn t_id, _track_id ->
         assert t_id == tenant_id
         {:ok, %{}}
       end)
+
       expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn t_id, _card_id ->
         assert t_id == tenant_id
         :ok
@@ -119,6 +128,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
     test "handles multiple cards" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -143,10 +153,12 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         assert t_id == tenant_id
         {:ok, %{id: "card-123"}}
       end)
+
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn t_id, _track_id ->
         assert t_id == tenant_id
         {:ok, %{}}
       end)
+
       expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, 3, fn t_id, _card_id ->
         assert t_id == tenant_id
         :ok
@@ -158,6 +170,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
     test "handles response without chunk_ids" do
       tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
       message = %{
         "tenant_id" => tenant_id,
         "user_id" => nil,
@@ -179,10 +192,12 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
         assert t_id == tenant_id
         {:ok, %{id: "card-123"}}
       end)
+
       expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn t_id, _track_id ->
         assert t_id == tenant_id
         {:ok, %{}}
       end)
+
       expect(BotArmyTerrain.EmbedWorkerMock, :queue_card, fn t_id, _card_id ->
         assert t_id == tenant_id
         :ok

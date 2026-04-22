@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.ReviewSessionStoreTest do
   use ExUnit.Case
+  @moduletag :stores
 
   describe "stats calculation" do
     test "accuracy calculation: 0 reviewed" do

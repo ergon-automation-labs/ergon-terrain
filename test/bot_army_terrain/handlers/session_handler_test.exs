@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.Handlers.SessionHandlerTest do
   use ExUnit.Case
+  @moduletag :handlers
   import Mox
   alias BotArmyTerrain.Handlers.SessionHandler
 
@@ -37,7 +38,11 @@ defmodule BotArmyTerrain.Handlers.SessionHandlerTest do
     end
 
     test "returns error for invalid track_id type" do
-      message = %{"track_id" => 123, "tenant_id" => BotArmyCore.Tenant.default_tenant_id(), "user_id" => nil}
+      message = %{
+        "track_id" => 123,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
+      }
 
       response = SessionHandler.handle_start(message)
       {:ok, data} = Jason.decode(response)
@@ -57,7 +62,11 @@ defmodule BotArmyTerrain.Handlers.SessionHandlerTest do
     end
 
     test "returns error for invalid session_id type" do
-      message = %{"session_id" => 123, "tenant_id" => BotArmyCore.Tenant.default_tenant_id(), "user_id" => nil}
+      message = %{
+        "session_id" => 123,
+        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "user_id" => nil
+      }
 
       response = SessionHandler.handle_end(message)
       {:ok, data} = Jason.decode(response)

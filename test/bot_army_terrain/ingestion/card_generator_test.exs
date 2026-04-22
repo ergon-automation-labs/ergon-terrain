@@ -1,5 +1,6 @@
 defmodule BotArmyTerrain.Ingestion.CardGeneratorTest do
   use ExUnit.Case, async: true
+  @moduletag :ingestion
 
   alias BotArmyTerrain.Ingestion.CardGenerator
 

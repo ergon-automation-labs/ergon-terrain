@@ -35,7 +35,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   @impl true
   def handle_info({:msg, %{topic: topic, body: body} = msg}, state) do
-    BotArmyRuntime.Tracing.with_consumer_span(topic, msg.headers, fn ->
+    BotArmyRuntime.Tracing.with_consumer_span(topic, Map.get(msg, :headers, []), fn ->
       Logger.debug("Terrain received NATS: #{topic}")
 
       case decode(body) do
