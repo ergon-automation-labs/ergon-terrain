@@ -16,6 +16,36 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   @reconnect_delay_ms 5000
 
+  @subjects [
+    %{subject: "terrain.tracks.list", type: :request_reply, description: "List all tracks"},
+    %{subject: "terrain.tracks.import", type: :request_reply, description: "Import track"},
+    %{
+      subject: "terrain.track.import",
+      type: :request_reply,
+      description: "Import track (singular)"
+    },
+    %{subject: "terrain.cards.due", type: :request_reply, description: "List due cards"},
+    %{subject: "terrain.review.submit", type: :request_reply, description: "Submit review"},
+    %{
+      subject: "terrain.session.start",
+      type: :request_reply,
+      description: "Start review session"
+    },
+    %{subject: "terrain.session.end", type: :request_reply, description: "End review session"},
+    %{subject: "terrain.session.stats", type: :request_reply, description: "Get session stats"},
+    %{subject: "terrain.cards.similar", type: :request_reply, description: "Find similar cards"},
+    %{
+      subject: "terrain.lesson.generation.request",
+      type: :request_reply,
+      description: "Request lesson generation"
+    },
+    %{subject: "terrain.lesson.get", type: :request_reply, description: "Get lesson"},
+    %{subject: "terrain.lesson.list", type: :request_reply, description: "List lessons"},
+    %{subject: "terrain.game.generate", type: :request_reply, description: "Generate game"},
+    %{subject: "terrain.game.status", type: :request_reply, description: "Get game status"},
+    %{subject: "terrain.game.get", type: :request_reply, description: "Get game data"}
+  ]
+
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -29,8 +59,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   @impl true
   def handle_continue(:connect, state) do
     case get_connection() do
-      {:ok, conn} -> subscribe(conn, state)
-      {:error, _} -> schedule_reconnect(state)
+      {:ok, conn} ->
+        BotArmyRuntime.Health.Responder.register_subjects(@subjects)
+        subscribe(conn, state)
+
+      {:error, _} ->
+        schedule_reconnect(state)
     end
   end
 
@@ -146,7 +180,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         }
       end)
 
-    Jason.encode!(%{"ok" => true, "tracks" => track_list})
+    BotArmyRuntime.NATS.Reply.ok(%{"tracks" => track_list})
   end
 
   defp handle_request("terrain.tracks.import", msg) do
@@ -155,29 +189,27 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     cond do
       is_nil(path) ->
-        Jason.encode!(%{"ok" => false, "error" => "path required"})
+        BotArmyRuntime.NATS.Reply.error("path required", :missing_path)
 
       not File.exists?(resolved_path) ->
-        Jason.encode!(%{
-          "ok" => false,
-          "error" => "file not found: #{resolved_path}",
-          "requested_path" => path
-        })
+        BotArmyRuntime.NATS.Reply.error("file not found: #{resolved_path}", :file_not_found)
 
       File.dir?(resolved_path) ->
         # Queue directory import asynchronously to avoid blocking RequestHandler
-        _task = Task.start(fn ->
-          case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(resolved_path) do
-            {:ok, result} ->
-              Logger.info("Track import queued: #{path} → #{result.tracks_imported} tracks, #{result.lessons_imported} lessons")
+        _task =
+          Task.start(fn ->
+            case BotArmyTerrain.Ingestion.LessonDirectoryImporter.import_directory(resolved_path) do
+              {:ok, result} ->
+                Logger.info(
+                  "Track import queued: #{path} → #{result.tracks_imported} tracks, #{result.lessons_imported} lessons"
+                )
 
-            {:error, reason} ->
-              Logger.error("Track import failed: #{path} → #{inspect(reason)}")
-          end
-        end)
+              {:error, reason} ->
+                Logger.error("Track import failed: #{path} → #{inspect(reason)}")
+            end
+          end)
 
-        Jason.encode!(%{
-          "ok" => true,
+        BotArmyRuntime.NATS.Reply.ok(%{
           "status" => "queued",
           "requested_path" => path,
           "resolved_path" => resolved_path,
@@ -186,18 +218,20 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
       true ->
         # Queue file import asynchronously to avoid blocking RequestHandler
-        _task = Task.start(fn ->
-          case BotArmyTerrain.Ingestion.YamlImporter.import_file(resolved_path) do
-            {:ok, result} ->
-              Logger.info("Track import completed: #{path} → #{result.track}, #{result.chunks_imported} chunks")
+        _task =
+          Task.start(fn ->
+            case BotArmyTerrain.Ingestion.YamlImporter.import_file(resolved_path) do
+              {:ok, result} ->
+                Logger.info(
+                  "Track import completed: #{path} → #{result.track}, #{result.chunks_imported} chunks"
+                )
 
-            {:error, reason} ->
-              Logger.error("Track import failed: #{path} → #{inspect(reason)}")
-          end
-        end)
+              {:error, reason} ->
+                Logger.error("Track import failed: #{path} → #{inspect(reason)}")
+            end
+          end)
 
-        Jason.encode!(%{
-          "ok" => true,
+        BotArmyRuntime.NATS.Reply.ok(%{
           "status" => "queued",
           "requested_path" => path,
           "resolved_path" => resolved_path,
@@ -226,9 +260,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           }
         end)
 
-      Jason.encode!(%{"ok" => true, "cards" => card_list})
+      BotArmyRuntime.NATS.Reply.ok(%{"cards" => card_list})
     else
-      Jason.encode!(%{"ok" => false, "error" => "track_id required", "cards" => []})
+      BotArmyRuntime.NATS.Reply.error("track_id required", :missing_track_id)
     end
   end
 
@@ -244,14 +278,19 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     session_id = msg["session_id"]
 
     if session_id do
-      store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+      store =
+        Application.get_env(
+          :bot_army_terrain,
+          :review_session_store,
+          BotArmyTerrain.ReviewSessionStore
+        )
 
       case store.get_session_stats(session_id) do
-        {:ok, stats} -> Jason.encode!(stats)
-        {:error, reason} -> Jason.encode!(%{"error" => inspect(reason)})
+        {:ok, stats} -> BotArmyRuntime.NATS.Reply.ok(stats)
+        {:error, reason} -> BotArmyRuntime.NATS.Reply.error(inspect(reason), :stats_error)
       end
     else
-      Jason.encode!(%{"error" => "session_id required"})
+      BotArmyRuntime.NATS.Reply.error("session_id required", :missing_session_id)
     end
   end
 
@@ -262,11 +301,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     if card_id do
       case CardStore.get_card(card_id) do
         nil ->
-          Jason.encode!(%{"ok" => false, "error" => "card not found", "cards" => []})
+          BotArmyRuntime.NATS.Reply.error("card not found", :card_not_found)
 
         card ->
           if card.embedding_vector do
-            similar_cards = CardStore.find_similar_cards(card.track_id, card.embedding_vector, limit)
+            similar_cards =
+              CardStore.find_similar_cards(card.track_id, card.embedding_vector, limit)
 
             card_list =
               Enum.map(similar_cards, fn result ->
@@ -278,13 +318,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
                 }
               end)
 
-            Jason.encode!(%{"ok" => true, "cards" => card_list})
+            BotArmyRuntime.NATS.Reply.ok(%{"cards" => card_list})
           else
-            Jason.encode!(%{"ok" => false, "error" => "card not embedded yet", "cards" => []})
+            BotArmyRuntime.NATS.Reply.error("card not embedded yet", :card_not_embedded)
           end
       end
     else
-      Jason.encode!(%{"ok" => false, "error" => "card_id required", "cards" => []})
+      BotArmyRuntime.NATS.Reply.error("card_id required", :missing_card_id)
     end
   end
 
@@ -297,17 +337,16 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       # Queue for background generation
       BotArmyTerrain.LessonGenerationWorker.queue_lesson(chunk_id, chunk_title, chunk_content)
 
-      Jason.encode!(%{
-        "ok" => true,
+      BotArmyRuntime.NATS.Reply.ok(%{
         "queued" => true,
         "chunk_id" => chunk_id,
         "message" => "Lesson generation queued"
       })
     else
-      Jason.encode!(%{
-        "ok" => false,
-        "error" => "chunk_id, chunk_title, and chunk_content required"
-      })
+      BotArmyRuntime.NATS.Reply.error(
+        "chunk_id, chunk_title, and chunk_content required",
+        :missing_fields
+      )
     end
   end
 
@@ -316,15 +355,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case BotArmyTerrain.LessonStore.get_lesson_by_chunk(chunk_id) do
       nil ->
-        Jason.encode!(%{
-          "ok" => false,
-          "error" => "lesson not found",
-          "chunk_id" => chunk_id
-        })
+        BotArmyRuntime.NATS.Reply.error("lesson not found", :lesson_not_found)
 
       lesson ->
-        Jason.encode!(%{
-          "ok" => true,
+        BotArmyRuntime.NATS.Reply.ok(%{
           "chunk_id" => lesson.chunk_id,
           "title" => lesson.title,
           "explanation" => lesson.explanation,
@@ -358,8 +392,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         }
       end)
 
-    Jason.encode!(%{
-      "ok" => true,
+    BotArmyRuntime.NATS.Reply.ok(%{
       "lessons" => lesson_list
     })
   end
@@ -369,14 +402,14 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     cond do
       is_nil(track_id) ->
-        Jason.encode!(%{"ok" => false, "error" => "track_id required"})
+        BotArmyRuntime.NATS.Reply.error("track_id required", :missing_track_id)
 
       is_nil(TrackStore.get_track(track_id)) ->
-        Jason.encode!(%{"ok" => false, "error" => "track not found"})
+        BotArmyRuntime.NATS.Reply.error("track not found", :track_not_found)
 
       true ->
         BotArmyTerrain.GameGenerationWorker.queue_generation(track_id)
-        Jason.encode!(%{"ok" => true, "status" => "queued"})
+        BotArmyRuntime.NATS.Reply.ok(%{"status" => "queued"})
     end
   end
 
@@ -385,11 +418,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
       nil ->
-        Jason.encode!(%{"ok" => true, "status" => "not_generated"})
+        BotArmyRuntime.NATS.Reply.ok(%{"status" => "not_generated"})
 
       game_state ->
         response = %{
-          "ok" => true,
           "status" => game_state.status,
           "track_id" => game_state.track_id
         }
@@ -401,7 +433,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
             response
           end
 
-        Jason.encode!(response)
+        BotArmyRuntime.NATS.Reply.ok(response)
     end
   end
 
@@ -410,21 +442,20 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
       %{status: "active"} = game_state ->
-        Jason.encode!(%{
-          "ok" => true,
+        BotArmyRuntime.NATS.Reply.ok(%{
           "game_json" => game_state.game_json,
           "dojo_json" => game_state.dojo_json,
           "generated_at" => DateTime.to_iso8601(game_state.generated_at)
         })
 
       _ ->
-        Jason.encode!(%{"ok" => false, "error" => "game not ready"})
+        BotArmyRuntime.NATS.Reply.error("game not ready", :game_not_ready)
     end
   end
 
   defp handle_request(topic, _msg) do
     Logger.warning("Unknown request topic: #{topic}")
-    Jason.encode!(%{"error" => "unknown topic"})
+    BotArmyRuntime.NATS.Reply.error("unknown topic", :unknown_topic)
   end
 
   defp handle_event("terrain.review.submit", msg) do
@@ -454,7 +485,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     cond do
       String.starts_with?(path, "/app/lessons_bot_army") ->
         # Bot-accessible path: always maps to /etc/bot_army/lessons
-        suffix = String.replace_prefix(path, "/app/lessons_bot_army", "") |> String.trim_leading("/")
+        suffix =
+          String.replace_prefix(path, "/app/lessons_bot_army", "") |> String.trim_leading("/")
 
         case suffix do
           "" -> "/etc/bot_army/lessons"

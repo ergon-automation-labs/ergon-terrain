@@ -11,11 +11,15 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
 
     with {:ok, track_id} <- extract_track_id(message),
          {:ok, session} <- create_session(tenant_id, track_id) do
-      Jason.encode!(%{"session_id" => session.id, "tenant_id" => tenant_id, "user_id" => user_id})
+      BotArmyRuntime.NATS.Reply.ok(%{
+        "session_id" => session.id,
+        "tenant_id" => tenant_id,
+        "user_id" => user_id
+      })
     else
       {:error, reason} ->
         Logger.error("Session start failed: #{inspect(reason)}")
-        Jason.encode!(%{"error" => inspect(reason)})
+        BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_start_failed)
     end
   end
 
@@ -26,11 +30,13 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
     with {:ok, session_id} <- extract_session_id(message),
          {:ok, stats} <- get_session_stats(tenant_id, session_id),
          :ok <- end_session_in_store(tenant_id, session_id) do
-      Jason.encode!(Map.merge(stats, %{"tenant_id" => tenant_id, "user_id" => user_id}))
+      BotArmyRuntime.NATS.Reply.ok(
+        Map.merge(stats, %{"tenant_id" => tenant_id, "user_id" => user_id})
+      )
     else
       {:error, reason} ->
         Logger.error("Session end failed: #{inspect(reason)}")
-        Jason.encode!(%{"error" => inspect(reason)})
+        BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_end_failed)
     end
   end
 
@@ -53,12 +59,23 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
   end
 
   defp create_session(tenant_id, track_id) do
-    store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+    store =
+      Application.get_env(
+        :bot_army_terrain,
+        :review_session_store,
+        BotArmyTerrain.ReviewSessionStore
+      )
+
     store.create_session(tenant_id, %{track_id: track_id})
   end
 
   defp end_session_in_store(tenant_id, session_id) do
-    store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+    store =
+      Application.get_env(
+        :bot_army_terrain,
+        :review_session_store,
+        BotArmyTerrain.ReviewSessionStore
+      )
 
     case store.end_session(tenant_id, session_id) do
       {:ok, _} -> :ok
@@ -67,7 +84,13 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
   end
 
   defp get_session_stats(tenant_id, session_id) do
-    store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+    store =
+      Application.get_env(
+        :bot_army_terrain,
+        :review_session_store,
+        BotArmyTerrain.ReviewSessionStore
+      )
+
     store.get_session_stats(tenant_id, session_id)
   end
 end
