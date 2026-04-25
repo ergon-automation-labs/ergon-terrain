@@ -15,22 +15,24 @@ defmodule BotArmyTerrain.Application do
 
   @impl true
   def start(_type, _args) do
-    children = []
-    |> maybe_add_repo()
-    |> maybe_add_track_store()
-    |> maybe_add_chunk_store()
-    |> maybe_add_card_store()
-    |> maybe_add_review_session_store()
-    |> maybe_add_embed_worker()
-    |> maybe_add_ingestion_worker()
-    |> maybe_add_lesson_generation_worker()
-    |> maybe_add_lesson_store()
-    |> maybe_add_lesson_embed_worker()
-    |> maybe_add_game_state_store()
-    |> maybe_add_game_generation_worker()
-    |> maybe_add_consumer()
-    |> maybe_add_event_handler()
-    |> maybe_add_request_handler()
+    children =
+      []
+      |> maybe_add_repo()
+      |> maybe_add_track_store()
+      |> maybe_add_chunk_store()
+      |> maybe_add_card_store()
+      |> maybe_add_review_session_store()
+      |> maybe_add_embed_worker()
+      |> maybe_add_ingestion_worker()
+      |> maybe_add_lesson_generation_worker()
+      |> maybe_add_lesson_store()
+      |> maybe_add_lesson_embed_worker()
+      |> maybe_add_game_state_store()
+      |> maybe_add_game_generation_worker()
+      |> maybe_add_pulse_publisher()
+      |> maybe_add_consumer()
+      |> maybe_add_event_handler()
+      |> maybe_add_request_handler()
 
     opts = [strategy: :one_for_one, name: BotArmyTerrain.Supervisor]
     Supervisor.start_link(children, opts)
@@ -61,7 +63,9 @@ defmodule BotArmyTerrain.Application do
   end
 
   defp maybe_add_ingestion_worker(children) do
-    if @env == :test, do: children, else: [{BotArmyTerrain.Ingestion.IngestionWorker, []} | children]
+    if @env == :test,
+      do: children,
+      else: [{BotArmyTerrain.Ingestion.IngestionWorker, []} | children]
   end
 
   defp maybe_add_lesson_generation_worker(children) do
@@ -82,6 +86,10 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_game_generation_worker(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.GameGenerationWorker, []} | children]
+  end
+
+  defp maybe_add_pulse_publisher(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.PulsePublisher, []} | children]
   end
 
   defp maybe_add_consumer(children) do
