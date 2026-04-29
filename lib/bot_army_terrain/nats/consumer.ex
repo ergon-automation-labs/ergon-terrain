@@ -10,6 +10,46 @@ defmodule BotArmyTerrain.NATS.Consumer do
   require Logger
 
   @reconnect_delay_ms 5000
+  @version Mix.Project.config()[:version]
+  @registry_heartbeat_ms 20_000
+
+  @subjects [
+    %{
+      subject: "bot.army.terrain.command.ingest",
+      type: :subscribe,
+      description: "Ingest terrain data"
+    },
+    %{
+      subject: "bot.army.terrain.command.import_cards",
+      type: :subscribe,
+      description: "Import cards"
+    },
+    %{
+      subject: "bot.army.terrain.command.generate_cards",
+      type: :subscribe,
+      description: "Generate cards"
+    },
+    %{
+      subject: "events.llm.response.parsed",
+      type: :subscribe,
+      description: "LLM response parsed"
+    },
+    %{
+      subject: "events.llm.embedding.created",
+      type: :subscribe,
+      description: "LLM embedding created"
+    },
+    %{
+      subject: "events.llm.completion.terrain.lesson_generation",
+      type: :subscribe,
+      description: "Lesson generation"
+    },
+    %{
+      subject: "events.llm.completion.terrain.game_generation",
+      type: :subscribe,
+      description: "Game generation"
+    }
+  ]
 
   def start_link(opts \\ []) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
@@ -101,6 +141,8 @@ defmodule BotArmyTerrain.NATS.Consumer do
       |> Enum.reject(&is_nil/1)
 
     if length(subs) > 0 do
+      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
+        Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
       {:noreply, %{state | subscriptions: subs}}
     else
       Logger.error("Terrain failed to subscribe to any subjects")
@@ -231,4 +273,14 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp handle_command(_topic, _msg), do: :ok
+  @impl true
+  def handle_info(:registry_heartbeat, state) do
+    if length(state.subscriptions) > 0 do
+      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
+      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
+    end
+
+    {:noreply, state}
+  end
+
 end
