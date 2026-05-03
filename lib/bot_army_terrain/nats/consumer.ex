@@ -105,6 +105,16 @@ defmodule BotArmyTerrain.NATS.Consumer do
     {:noreply, state, {:continue, :connect}}
   end
 
+  @impl true
+  def handle_info(:registry_heartbeat, state) do
+    if length(state.subscriptions) > 0 do
+      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
+      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
+    end
+
+    {:noreply, state}
+  end
+
   defp get_connection do
     try do
       GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
@@ -142,7 +152,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
     if length(subs) > 0 do
       BotArmyRuntime.Registry.register("terrain", @subjects, @version)
-        Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
+      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
       {:noreply, %{state | subscriptions: subs}}
     else
       Logger.error("Terrain failed to subscribe to any subjects")
@@ -273,14 +283,4 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp handle_command(_topic, _msg), do: :ok
-  @impl true
-  def handle_info(:registry_heartbeat, state) do
-    if length(state.subscriptions) > 0 do
-      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
-      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
-    end
-
-    {:noreply, state}
-  end
-
 end

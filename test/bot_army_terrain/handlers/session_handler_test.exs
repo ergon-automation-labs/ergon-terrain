@@ -23,9 +23,11 @@ defmodule BotArmyTerrain.Handlers.SessionHandlerTest do
       response = SessionHandler.handle_start(message)
       {:ok, data} = Jason.decode(response)
 
-      assert Map.has_key?(data, "session_id")
-      assert data["session_id"] == session_id
-      assert data["tenant_id"] == tenant_id
+      assert data["ok"] == true
+      inner = data["data"]
+      assert Map.has_key?(inner, "session_id")
+      assert inner["session_id"] == session_id
+      assert inner["tenant_id"] == tenant_id
     end
 
     test "returns error for missing track_id" do
