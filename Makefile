@@ -114,34 +114,25 @@ release: check
 	@echo ""
 
 publish-release: release
-	@echo "==============================================="
-	@echo "Publishing release to GitHub"
-	@echo "==============================================="
-	@echo ""
-
-	# Get version from mix.exs
+	@set -e; \
 	VERSION=$$(sed -n 's/^[[:space:]]*version:[[:space:]]*"\([^"]*\)".*/\1/p' mix.exs | head -n 1); \
 	if [ -z "$$VERSION" ]; then echo "Failed to resolve version from mix.exs"; exit 1; fi; \
+	TARBALL=terrain_bot-$$VERSION.tar.gz; \
 	echo "Version: $$VERSION"; \
-	\
-	# Create tarball
 	echo "Creating release tarball..."; \
-	tar -czf terrain_bot-$$VERSION.tar.gz -C _build/prod/rel terrain_bot/; \
-	echo "✓ Tarball created: terrain_bot-$$VERSION.tar.gz"; \
+	tar -czf "$$TARBALL" -C _build/prod/rel terrain_bot/; \
+	echo "✓ Tarball created: $$TARBALL"; \
 	echo ""; \
-	\
-	# Create GitHub release
 	echo "Creating GitHub release v$$VERSION..."; \
-	gh release create v$$VERSION terrain_bot-$$VERSION.tar.gz \
-		--title "Release v$$VERSION" \
-		--notes "Terrain Bot Elixir release v$$VERSION. Download and deploy with Jenkins." \
-		--draft=false; \
+	if gh release view "v$$VERSION" >/dev/null 2>&1; then \
+		gh release upload "v$$VERSION" "$$TARBALL" --clobber; \
+	else \
+		gh release create "v$$VERSION" "$$TARBALL" \
+			--title "Release v$$VERSION" \
+			--notes "Terrain Bot Elixir release v$$VERSION. Download and deploy with Jenkins." \
+			--draft=false; \
+	fi; \
 	echo "✓ Release published to GitHub"; \
-	echo ""; \
-	echo "Next steps:"; \
-	echo "1. Jenkins will automatically detect the new release"; \
-	echo "2. Trigger deployment in Jenkins UI or wait for auto-deployment"; \
-	echo "3. Check deployment status: make jenkins-logs"; \
 	echo ""
 
 push-and-publish:
