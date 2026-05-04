@@ -41,7 +41,7 @@ defmodule BotArmyTerrain.GraphMigrations.V001CreateSchema do
     rescue
       e ->
         Logger.error("[Migration V001] Graph verification failed", error: inspect(e))
-        raise "Could not verify knowledge graph: #{inspect(e)}"
+        reraise e, __STACKTRACE__
     end
   end
 end

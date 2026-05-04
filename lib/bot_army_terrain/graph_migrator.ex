@@ -175,7 +175,7 @@ defmodule BotArmyTerrain.GraphMigrator do
           stacktrace: __STACKTRACE__
         )
 
-        raise "Migration #{version} failed: #{inspect(e)}"
+        reraise e, __STACKTRACE__
     end
   end
 
