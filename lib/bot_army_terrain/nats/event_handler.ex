@@ -39,8 +39,11 @@ defmodule BotArmyTerrain.NATS.EventHandler do
     Logger.debug("[TerrainEventHandler] Received: #{topic}")
 
     case decode(body) do
-      {:ok, msg} -> handle_event(topic, msg)
-      {:error, reason} -> Logger.warning("[TerrainEventHandler] Decode failed: #{inspect(reason)}")
+      {:ok, msg} ->
+        handle_event(topic, msg)
+
+      {:error, reason} ->
+        Logger.warning("[TerrainEventHandler] Decode failed: #{inspect(reason)}")
     end
 
     {:noreply, state}
@@ -77,13 +80,16 @@ defmodule BotArmyTerrain.NATS.EventHandler do
             sub
 
           {:error, reason} ->
-            Logger.error("[TerrainEventHandler] Subscribe failed for #{subject}: #{inspect(reason)}")
+            Logger.error(
+              "[TerrainEventHandler] Subscribe failed for #{subject}: #{inspect(reason)}"
+            )
+
             nil
         end
       end)
       |> Enum.reject(&is_nil/1)
 
-    if length(subs) > 0 do
+    if subs != [] do
       {:noreply, %{state | subscriptions: subs}}
     else
       Logger.error("[TerrainEventHandler] Failed to subscribe to any subjects")
