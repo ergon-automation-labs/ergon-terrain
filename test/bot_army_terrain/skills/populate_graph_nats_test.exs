@@ -108,7 +108,7 @@ defmodule BotArmyTerrain.Skills.PopulateGraphNATSTest do
       triggers = skill.nats_triggers()
 
       assert is_list(triggers)
-      assert length(triggers) > 0
+      assert triggers != []
       assert Enum.any?(triggers, &String.contains?(&1, "populate_graph"))
     end
   end
