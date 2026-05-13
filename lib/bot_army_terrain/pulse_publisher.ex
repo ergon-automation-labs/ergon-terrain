@@ -132,6 +132,47 @@ defmodule BotArmyTerrain.PulsePublisher do
   defp publish_pulse(state) do
     pulse = build_pulse(state)
     publish_to_nats(pulse)
+    maybe_publish_tavern_gossip(state)
+  end
+
+  defp maybe_publish_tavern_gossip(state) do
+    text =
+      cond do
+        state.cards_generated >= 10 ->
+          "📜 #{state.cards_generated} cards forged today. The dojo hums with knowledge."
+
+        state.cards_generated > 0 ->
+          "📜 #{state.cards_generated} card#{if(state.cards_generated > 1, do: "s", else: "")} forged. Slow but steady."
+
+        MapSet.size(state.active_learners) > 0 ->
+          "🎯 #{MapSet.size(state.active_learners)} learner#{if(MapSet.size(state.active_learners) > 1, do: "s", else: "")} active. Waiting for new material."
+
+        true ->
+          nil
+      end
+
+    if text do
+      gossip = %{
+        "event" => "gossip.tavern.narrated",
+        "source" => "terrain_bot",
+        "text" => text,
+        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
+      }
+
+      case GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5_000) do
+        {:ok, conn} ->
+          case Gnat.pub(conn, "gossip.tavern.narrated", Jason.encode!(gossip)) do
+            :ok ->
+              Logger.info("[PulsePublisher] Published tavern gossip")
+
+            {:error, reason} ->
+              Logger.warning("[PulsePublisher] Gossip failed: #{inspect(reason)}")
+          end
+
+        {:error, reason} ->
+          Logger.warning("[PulsePublisher] NATS unavailable for gossip: #{inspect(reason)}")
+      end
+    end
   end
 
   defp build_pulse(state) do
