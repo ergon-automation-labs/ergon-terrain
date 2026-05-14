@@ -43,7 +43,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     %{subject: "terrain.lesson.list", type: :request_reply, description: "List lessons"},
     %{subject: "terrain.game.generate", type: :request_reply, description: "Generate game"},
     %{subject: "terrain.game.status", type: :request_reply, description: "Get game status"},
-    %{subject: "terrain.game.get", type: :request_reply, description: "Get game data"}
+    %{subject: "terrain.game.get", type: :request_reply, description: "Get game data"},
+    %{
+      subject: "terrain.system.srs_signal",
+      type: :request_reply,
+      description: "System-wide SM-2 signal for retry confidence"
+    }
   ]
 
   def start_link(opts \\ []) do
@@ -127,7 +132,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.lesson.list",
       "terrain.game.generate",
       "terrain.game.status",
-      "terrain.game.get"
+      "terrain.game.get",
+      "terrain.system.srs_signal"
     ]
 
     results =
@@ -352,8 +358,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp handle_request("terrain.lesson.get", msg) do
     chunk_id = msg["chunk_id"]
+    tenant_id = msg["tenant_id"] || BotArmyCore.Tenant.default_tenant_id()
 
-    case BotArmyTerrain.LessonStore.get_lesson_by_chunk(chunk_id) do
+    case BotArmyTerrain.LessonStore.get_lesson_by_chunk(tenant_id, chunk_id) do
       nil ->
         BotArmyRuntime.NATS.Reply.error("lesson not found", :lesson_not_found)
 
@@ -377,8 +384,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     end
   end
 
-  defp handle_request("terrain.lesson.list", _msg) do
-    lessons = BotArmyTerrain.LessonStore.list_lessons()
+  defp handle_request("terrain.lesson.list", msg) do
+    tenant_id = msg["tenant_id"] || BotArmyCore.Tenant.default_tenant_id()
+    lessons = BotArmyTerrain.LessonStore.list_lessons(tenant_id)
 
     lesson_list =
       Enum.map(lessons, fn l ->
@@ -451,6 +459,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       _ ->
         BotArmyRuntime.NATS.Reply.error("game not ready", :game_not_ready)
     end
+  end
+
+  defp handle_request("terrain.system.srs_signal", msg) do
+    BotArmyTerrain.Handlers.SystemSignalHandler.handle_request(msg)
   end
 
   defp handle_request(topic, _msg) do
