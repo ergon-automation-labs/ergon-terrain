@@ -4,7 +4,8 @@ defmodule BotArmyTerrain.Handlers.SystemSignalHandlerTest do
 
   alias BotArmyTerrain.Handlers.SystemSignalHandler
 
-  describe "handle_request/1", do: @tag(:integration) do
+  describe "handle_request/1" do
+    @tag :integration
     test "returns JSON response with signal data" do
       response = SystemSignalHandler.handle_request(%{})
 
