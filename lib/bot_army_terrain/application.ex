@@ -30,6 +30,7 @@ defmodule BotArmyTerrain.Application do
       |> maybe_add_game_state_store()
       |> maybe_add_game_generation_worker()
       |> maybe_add_pulse_publisher()
+      |> maybe_add_outcome_tracker()
       |> maybe_add_consumer()
       |> maybe_add_event_handler()
       |> maybe_add_request_handler()
@@ -102,5 +103,9 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_event_handler(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.NATS.EventHandler, []} | children]
+  end
+
+  defp maybe_add_outcome_tracker(children) do
+    if @env == :test, do: children, else: [{BotArmyLearning.OutcomeTracker, []} | children]
   end
 end

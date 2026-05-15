@@ -32,6 +32,21 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
          :ok <- persist_card(tenant_id, card, new_fields) do
       log_review(card_id, quality, new_fields)
       record_card_review(tenant_id, user_id, message)
+
+      # Record outcome: card review quality (spaced repetition effectiveness)
+      try do
+        was_successful = quality >= 3
+
+        BotArmyLearning.OutcomeTracker.record(
+          card_id,
+          "terrain.card_review",
+          "act",
+          if(was_successful, do: "success", else: "failure")
+        )
+      rescue
+        _ -> :ok
+      end
+
       :ok
     else
       {:error, reason} -> {:error, reason}
@@ -48,11 +63,17 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
 
   defp extract_quality(message) do
     case message["quality"] do
-      nil -> {:error, :missing_quality}
-      quality when is_integer(quality) and quality >= 0 and quality <= 5 -> {:ok, quality}
+      nil ->
+        {:error, :missing_quality}
+
+      quality when is_integer(quality) and quality >= 0 and quality <= 5 ->
+        {:ok, quality}
+
       quality when is_float(quality) and quality >= 0.0 and quality <= 5.0 ->
         {:ok, trunc(quality)}
-      _ -> {:error, :invalid_quality}
+
+      _ ->
+        {:error, :invalid_quality}
     end
   end
 
@@ -91,14 +112,22 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
         :ok
 
       session_id ->
-        store = Application.get_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStore)
+        store =
+          Application.get_env(
+            :bot_army_terrain,
+            :review_session_store,
+            BotArmyTerrain.ReviewSessionStore
+          )
 
         case store.record_card_review(tenant_id, user_id, message) do
           :ok ->
             :ok
 
           {:error, reason} ->
-            Logger.warning("Failed to record card review for session #{session_id}: #{inspect(reason)}")
+            Logger.warning(
+              "Failed to record card review for session #{session_id}: #{inspect(reason)}"
+            )
+
             :ok
         end
     end
