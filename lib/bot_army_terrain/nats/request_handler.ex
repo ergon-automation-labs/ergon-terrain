@@ -533,12 +533,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp configured_lessons_root do
     env_root = System.get_env("TERRAIN_LESSONS_ROOT")
 
-    cond do
-      is_binary(env_root) and String.trim(env_root) != "" ->
-        env_root
-
-      true ->
-        "/etc/bot_army/lessons"
+    if is_binary(env_root) and String.trim(env_root) != "" do
+      env_root
+    else
+      "/etc/bot_army/lessons"
     end
   end
 end

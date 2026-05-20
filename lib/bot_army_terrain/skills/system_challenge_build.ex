@@ -69,10 +69,8 @@ defmodule BotArmyTerrain.Skills.SystemChallengeBuild do
          {:ok, user_id} <- optional_uuid(payload["user_id"]),
          {:ok, challenge_date} <- challenge_date(payload),
          slug = payload["challenge_slug"] || "system-daily",
-         chunk_id = deterministic_chunk_id(tenant_id, challenge_date, slug),
-         {:ok, result} <-
-           persist_and_publish(payload, tenant_id, user_id, challenge_date, slug, chunk_id) do
-      {:ok, result}
+         chunk_id = deterministic_chunk_id(tenant_id, challenge_date, slug) do
+      persist_and_publish(payload, tenant_id, user_id, challenge_date, slug, chunk_id)
     end
   end
 

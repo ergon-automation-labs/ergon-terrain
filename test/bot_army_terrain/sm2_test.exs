@@ -206,12 +206,12 @@ defmodule BotArmyTerrain.SM2Test do
       before = DateTime.utc_now()
       result = SM2.schedule(card, 4)
 
-      # Should be 1 day in the future (86400 seconds)
+      # Should be 1 day in the future (86_400 seconds)
       seconds_diff = DateTime.diff(result.next_review_at, before, :second)
 
       # Allow 1 second tolerance
-      assert seconds_diff >= 86399
-      assert seconds_diff <= 86401
+      assert seconds_diff >= 86_399
+      assert seconds_diff <= 86_401
     end
 
     test "handles missing fields with defaults" do

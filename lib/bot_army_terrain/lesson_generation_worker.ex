@@ -16,6 +16,7 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
 
   # Queue structure: %{chunk_id => {chunk_title, chunk_content, retries}}
   defmodule State do
+    @moduledoc false
     defstruct queue: %{}, processing: nil, opts: []
   end
 
@@ -61,11 +62,13 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
   @impl true
   def handle_call(:status, _from, state) do
     queue_size = map_size(state.queue)
+
     status = %{
       "queue_size" => queue_size,
       "processing" => state.processing,
       "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
     }
+
     {:reply, status, state}
   end
 
@@ -84,12 +87,13 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
 
       {:wait, new_state} ->
         # No items in queue, wait longer
-        Process.send_after(self(), :process_next, 10000)
+        Process.send_after(self(), :process_next, 10_000)
         {:noreply, new_state}
     end
   end
 
-  defp process_next_in_queue(%{queue: queue, processing: nil} = state) when map_size(queue) == 0 do
+  defp process_next_in_queue(%{queue: queue, processing: nil} = state)
+       when map_size(queue) == 0 do
     {:wait, state}
   end
 
@@ -164,6 +168,7 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
     # Returns {:ok, demo_lesson} if NATS unavailable (falls back to synchronous demo)
     # Returns {:error, reason} on submission failure
     default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+
     case LessonHandler.generate_lesson(default_tenant_id, chunk_id, chunk_title, chunk_content) do
       {:ok, :submitted} ->
         # LLM request submitted successfully — completion event fires async

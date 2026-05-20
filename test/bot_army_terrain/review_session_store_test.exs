@@ -56,9 +56,9 @@ defmodule BotArmyTerrain.ReviewSessionStoreTest do
 
     test "duration: completed session" do
       start = DateTime.utc_now()
-      end_time = DateTime.add(start, 10000, :millisecond)
+      end_time = DateTime.add(start, 10_000, :millisecond)
       duration = DateTime.diff(end_time, start, :millisecond)
-      assert duration == 10000
+      assert duration == 10_000
     end
   end
 end

@@ -101,9 +101,8 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
       content_hash: content_hash
     }
 
-    with {:ok, chunk} <- chunk_store().upsert_chunk(attrs) do
-      build_llm_request_and_publish(track_id, chunk.id, chunk_content, model)
-    else
+    case chunk_store().upsert_chunk(attrs) do
+      {:ok, chunk} -> build_llm_request_and_publish(track_id, chunk.id, chunk_content, model)
       {:error, reason} -> {:error, reason}
     end
   end
