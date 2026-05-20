@@ -1,6 +1,7 @@
 defmodule BotArmyTerrain.Skills.PopulateGraphNATSTest do
   use ExUnit.Case
   @moduletag :skills
+  @tag :integration
 
   @moduledoc """
   Real NATS integration test for PopulateGraph skill.
