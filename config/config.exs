@@ -21,7 +21,7 @@ config :bot_army_terrain, ecto_repos: [BotArmyTerrain.Repo]
 # Enable knowledge graph support (Apache AGE on PostgreSQL)
 # Connection details are configured in config/runtime.exs to read GRAPHDB_NAME from environment
 # NOTE: Graph support requires AGE extension to be installed on the PostgreSQL instance
-config :bot_army_core, :graph_enabled, false
+config :bot_army_library_core, :graph_enabled, false
 
 # Terrain uses its own Postgres schema "terrain" (shared instance).
 # Defaults: local dev DB; override with BOT_ARMY_TERRAIN_DB_* or DATABASE_*.

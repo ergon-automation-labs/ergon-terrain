@@ -24,9 +24,9 @@ config :bot_army_terrain, BotArmyTerrain.Repo,
   ssl: false
 
 # Learning library configuration (uses same database as this bot)
-config :bot_army_learning, ecto_repos: [BotArmyLearning.Repo]
+config :bot_army_library_learning, ecto_repos: [BotArmyLearning.Repo]
 
-config :bot_army_learning, BotArmyLearning.Repo,
+config :bot_army_library_learning, BotArmyLearning.Repo,
   database:
     System.get_env("BOT_ARMY_TERRAIN_DB_NAME") || System.get_env("DATABASE_NAME") ||
       "ergon_terrain",
@@ -47,7 +47,7 @@ config :bot_army_learning, BotArmyLearning.Repo,
 # Graph database configuration at runtime (postgres-age, port 30002)
 # Priority: GRAPHDB_* (set by Salt) > defaults
 # Uses per-bot database name: ergon_graphdb_terrain (not shared ergon_graphs)
-config :bot_army_core, BotArmyCore.GraphRepo,
+config :bot_army_library_core, BotArmyCore.GraphRepo,
   hostname: System.get_env("GRAPHDB_HOST", "localhost"),
   port: String.to_integer(System.get_env("GRAPHDB_PORT", "30002")),
   username: System.get_env("GRAPHDB_USER", "postgres"),
