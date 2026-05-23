@@ -27,11 +27,10 @@ defmodule BotArmyTerrain.Release do
   end
 
   def migrate do
-    load_app()
-
-    for repo <- repos() do
-      {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
-    end
+    BotArmyRuntime.Ecto.MigrationRunner.run(
+      repo_module: BotArmyTerrain.Repo,
+      app_module: @app
+    )
   end
 
   def migrate_graph do
