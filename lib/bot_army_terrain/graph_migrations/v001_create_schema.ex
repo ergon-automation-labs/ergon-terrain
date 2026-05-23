@@ -30,7 +30,7 @@ defmodule BotArmyTerrain.GraphMigrations.V001CreateSchema do
     try do
       sql = "SELECT 1 FROM ag_graph WHERE name = 'knowledge'"
 
-      case BotArmyCore.GraphRepo.query(sql, []) do
+      case BotArmyTerrain.GraphRepo.query(sql, []) do
         {:ok, result} when result.num_rows > 0 ->
           Logger.info("[Migration V001] Knowledge graph verified")
           :ok

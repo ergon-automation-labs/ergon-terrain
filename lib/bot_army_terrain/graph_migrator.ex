@@ -57,7 +57,7 @@ defmodule BotArmyTerrain.GraphMigrator do
     try do
       sql = "SELECT 1 FROM ag_graph WHERE name = 'knowledge'"
 
-      case BotArmyCore.GraphRepo.query(sql, []) do
+      case BotArmyTerrain.GraphRepo.query(sql, []) do
         {:ok, result} when result.num_rows > 0 ->
           :ok
 
@@ -79,7 +79,7 @@ defmodule BotArmyTerrain.GraphMigrator do
       cypher = "MATCH (m:_Migration) RETURN m.version as version ORDER BY version"
       sql = "SELECT * FROM cypher('knowledge', $1) AS (result agtype)"
 
-      case BotArmyCore.GraphRepo.query(sql, [cypher]) do
+      case BotArmyTerrain.GraphRepo.query(sql, [cypher]) do
         {:ok, _result} ->
           # Query succeeded, assume versions exist (we'll verify on next run)
           # For now, just return empty since we can't deserialize agtype
@@ -190,7 +190,7 @@ defmodule BotArmyTerrain.GraphMigrator do
     sql = "SELECT * FROM cypher('knowledge', $1) AS (result agtype)"
 
     try do
-      BotArmyCore.GraphRepo.query!(sql, [cypher])
+      BotArmyTerrain.GraphRepo.query!(sql, [cypher])
       :ok
     rescue
       e ->

@@ -40,7 +40,15 @@ defmodule BotArmyTerrain.Application do
   end
 
   defp maybe_add_repo(children) do
-    if @env == :test, do: children, else: [BotArmyTerrain.Repo | children]
+    if @env == :test do
+      children
+    else
+      [
+        BotArmyTerrain.Repo,
+        {BotArmyTerrain.GraphRepo, restart: :temporary}
+        | children
+      ]
+    end
   end
 
   defp maybe_add_track_store(children) do

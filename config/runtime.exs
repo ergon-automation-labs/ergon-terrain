@@ -45,9 +45,7 @@ config :bot_army_library_learning, BotArmyLearning.Repo,
   ssl: false
 
 # Graph database configuration at runtime (postgres-age, port 30002)
-# Priority: GRAPHDB_* (set by Salt) > defaults
-# Uses per-bot database name: ergon_graphdb_terrain (not shared ergon_graphs)
-config :bot_army_library_core, BotArmyCore.GraphRepo,
+config :bot_army_terrain, BotArmyTerrain.GraphRepo,
   hostname: System.get_env("GRAPHDB_HOST", "localhost"),
   port: String.to_integer(System.get_env("GRAPHDB_PORT", "30002")),
   username: System.get_env("GRAPHDB_USER", "postgres"),
