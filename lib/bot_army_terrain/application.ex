@@ -116,6 +116,10 @@ defmodule BotArmyTerrain.Application do
   defp maybe_add_outcome_tracker(children) do
     if @env == :test,
       do: children,
-      else: [{BotArmyLearning.OutcomeTracker, [repo: BotArmyTerrain.Repo]} | children]
+      else: [
+        {BotArmyLearning.OutcomeTracker,
+         [repo: BotArmyTerrain.Repo, name: :terrain_outcome_tracker]}
+        | children
+      ]
   end
 end

@@ -41,7 +41,8 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
           card_id,
           "terrain.card_review",
           "act",
-          if(was_successful, do: "success", else: "failure")
+          if(was_successful, do: "success", else: "failure"),
+          :terrain_outcome_tracker
         )
       rescue
         _ -> :ok
