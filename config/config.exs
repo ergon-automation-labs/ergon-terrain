@@ -16,6 +16,8 @@ if File.exists?("config/.env") or File.exists?(".env") do
   end)
 end
 
+config :bot_army_terrain, :deployment_status, "experimental"
+
 config :bot_army_terrain, ecto_repos: [BotArmyTerrain.Repo, BotArmyTerrain.GraphRepo]
 
 # Configure library graph functions to use this bot's repo

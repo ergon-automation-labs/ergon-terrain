@@ -108,7 +108,10 @@ defmodule BotArmyTerrain.NATS.Consumer do
   @impl true
   def handle_info(:registry_heartbeat, state) do
     if state.subscriptions != [] do
-      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
+      deployment_status =
+        Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
+
+      Registry.register("terrain", @subjects, @version, deployment_status)
       Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
     end
 
@@ -151,7 +154,10 @@ defmodule BotArmyTerrain.NATS.Consumer do
       |> Enum.reject(&is_nil/1)
 
     if subs != [] do
-      BotArmyRuntime.Registry.register("terrain", @subjects, @version)
+      BotArmyRuntime.deployment_status() =
+        Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
+
+      Registry.register("terrain", @subjects, @version, deployment_status)
       Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
       {:noreply, %{state | subscriptions: subs}}
     else
