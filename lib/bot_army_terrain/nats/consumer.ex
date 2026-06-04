@@ -154,7 +154,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
       |> Enum.reject(&is_nil/1)
 
     if subs != [] do
-      BotArmyRuntime.deployment_status() =
+      deployment_status =
         Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
 
       Registry.register("terrain", @subjects, @version, deployment_status)
