@@ -111,7 +111,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
       deployment_status =
         Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
 
-      Registry.register("terrain", @subjects, @version, deployment_status)
+      register_with_retry("terrain", @subjects, @version, deployment_status, 0)
       Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
     end
 
@@ -157,9 +157,15 @@ defmodule BotArmyTerrain.NATS.Consumer do
       deployment_status =
         Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
 
-      Registry.register("terrain", @subjects, @version, deployment_status)
-      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
-      {:noreply, %{state | subscriptions: subs}}
+      case register_with_retry("terrain", @subjects, @version, deployment_status, 0) do
+        :ok ->
+          Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
+          {:noreply, %{state | subscriptions: subs}}
+
+        :error ->
+          Logger.error("Terrain failed to register with registry")
+          schedule_reconnect(state)
+      end
     else
       Logger.error("Terrain failed to subscribe to any subjects")
       schedule_reconnect(state)
@@ -289,4 +295,21 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp handle_command(_topic, _msg), do: :ok
+
+  # Private functions
+
+  defp register_with_retry(_bot, _subjects, _version, _status, attempts) when attempts > 3 do
+    :error
+  end
+
+  defp register_with_retry(bot, subjects, version, status, attempts) do
+    try do
+      BotArmyRuntime.Registry.register(bot, subjects, version, status)
+      :ok
+    rescue
+      _e ->
+        Process.sleep(100 * (attempts + 1))
+        register_with_retry(bot, subjects, version, status, attempts + 1)
+    end
+  end
 end
