@@ -27,9 +27,17 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
 
     case {phase, Jason.decode(json_text)} do
       {"game", {:ok, game_json}} ->
+        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_phase_parsed", 1,
+          metadata: %{track_id: track_id, tenant_id: tenant_id}
+        )
+
         handle_game_phase_complete(tenant_id, user_id, track_id, game_json)
 
       {"dojo", {:ok, dojo_json}} ->
+        BotArmyRuntime.Outcomes.emit("terrain", "generation", "dojo_phase_parsed", 1,
+          metadata: %{track_id: track_id, tenant_id: tenant_id}
+        )
+
         handle_dojo_phase_complete(tenant_id, user_id, track_id, dojo_json)
 
       {phase, {:error, decode_error}} ->
@@ -38,7 +46,23 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
         )
 
         GameStateStore.mark_status(tenant_id, track_id, "stale")
-        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => phase, "tenant_id" => tenant_id, "user_id" => user_id})
+
+        emit_event("terrain.game.generation.failed", %{
+          "track_id" => track_id,
+          "phase" => phase,
+          "tenant_id" => tenant_id,
+          "user_id" => user_id
+        })
+
+        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_parse_failed", 0,
+          metadata: %{
+            track_id: track_id,
+            phase: phase,
+            tenant_id: tenant_id,
+            reason: inspect(decode_error)
+          }
+        )
+
         {:error, decode_error}
     end
   end
@@ -57,7 +81,12 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
     lessons = LessonStore.list_lessons_by_track(tenant_id, track_id)
     GameGenerationHandler.generate_dojo(tenant_id, user_id, track_id, lessons)
 
-    emit_event("terrain.game.generation.progress", %{"track_id" => track_id, "phase" => "dojo", "tenant_id" => tenant_id, "user_id" => user_id})
+    emit_event("terrain.game.generation.progress", %{
+      "track_id" => track_id,
+      "phase" => "dojo",
+      "tenant_id" => tenant_id,
+      "user_id" => user_id
+    })
   end
 
   defp handle_dojo_phase_complete(tenant_id, user_id, track_id, _dojo_json_data) do
@@ -71,12 +100,33 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
            generated_at: DateTime.utc_now(:microsecond)
          }) do
       {:ok, _} ->
-        emit_event("terrain.game.generation.completed", %{"track_id" => track_id, "tenant_id" => tenant_id, "user_id" => user_id})
+        emit_event("terrain.game.generation.completed", %{
+          "track_id" => track_id,
+          "tenant_id" => tenant_id,
+          "user_id" => user_id
+        })
+
         Logger.info("Terrain: game generation completed for track #{track_id}")
 
+        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_completed", 1,
+          metadata: %{track_id: track_id, tenant_id: tenant_id}
+        )
+
       {:error, reason} ->
-        Logger.error("Terrain: failed to store dojo state for track #{track_id}: #{inspect(reason)}")
-        emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => "dojo", "tenant_id" => tenant_id, "user_id" => user_id})
+        Logger.error(
+          "Terrain: failed to store dojo state for track #{track_id}: #{inspect(reason)}"
+        )
+
+        emit_event("terrain.game.generation.failed", %{
+          "track_id" => track_id,
+          "phase" => "dojo",
+          "tenant_id" => tenant_id,
+          "user_id" => user_id
+        })
+
+        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_store_failed", 0,
+          metadata: %{track_id: track_id, tenant_id: tenant_id, reason: inspect(reason)}
+        )
     end
   end
 

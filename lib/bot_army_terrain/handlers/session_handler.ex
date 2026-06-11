@@ -11,6 +11,10 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
 
     with {:ok, track_id} <- extract_track_id(message),
          {:ok, session} <- create_session(tenant_id, track_id) do
+      BotArmyRuntime.Outcomes.emit("terrain", "session", "session_started", 1,
+        metadata: %{session_id: session.id, track_id: track_id, tenant_id: tenant_id}
+      )
+
       BotArmyRuntime.NATS.Reply.ok(%{
         "session_id" => session.id,
         "tenant_id" => tenant_id,
@@ -19,6 +23,11 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
     else
       {:error, reason} ->
         Logger.error("Session start failed: #{inspect(reason)}")
+
+        BotArmyRuntime.Outcomes.emit("terrain", "session", "session_start_failed", 0,
+          metadata: %{reason: inspect(reason), tenant_id: tenant_id}
+        )
+
         BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_start_failed)
     end
   end
@@ -30,12 +39,21 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
     with {:ok, session_id} <- extract_session_id(message),
          {:ok, stats} <- get_session_stats(tenant_id, session_id),
          :ok <- end_session_in_store(tenant_id, session_id) do
+      BotArmyRuntime.Outcomes.emit("terrain", "session", "session_ended", 1,
+        metadata: %{session_id: session_id, tenant_id: tenant_id, stats: inspect(stats)}
+      )
+
       BotArmyRuntime.NATS.Reply.ok(
         Map.merge(stats, %{"tenant_id" => tenant_id, "user_id" => user_id})
       )
     else
       {:error, reason} ->
         Logger.error("Session end failed: #{inspect(reason)}")
+
+        BotArmyRuntime.Outcomes.emit("terrain", "session", "session_end_failed", 0,
+          metadata: %{reason: inspect(reason), tenant_id: tenant_id}
+        )
+
         BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_end_failed)
     end
   end
