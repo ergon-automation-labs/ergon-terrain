@@ -41,7 +41,7 @@ config :bot_army_terrain, BotArmyTerrain.Repo,
   password:
     System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") ||
       System.get_env("DATABASE_PASSWORD", "postgres"),
-  pool_size: 10
+  pool_size: 15
 
 config :logger,
   level: :info,
