@@ -9,7 +9,6 @@ defmodule BotArmyTerrain.NATS.Consumer do
   use GenServer
   require Logger
 
-  @reconnect_delay_ms 5000
   @version Mix.Project.config()[:version]
   @registry_heartbeat_ms 20_000
 
@@ -57,7 +56,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   @impl true
   def init(opts) do
-    state = %{subscriptions: [], opts: opts}
+    state = %{subscriptions: [], opts: opts, reconnect_attempt: 0}
     {:ok, state, {:continue, :connect}}
   end
 
@@ -94,15 +93,21 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   @impl true
   def handle_info({:nats, :disconnected}, state) do
-    Logger.warning("Terrain disconnected from NATS, will reconnect")
-    Process.send_after(self(), :connect_retry, @reconnect_delay_ms)
-    {:noreply, %{state | subscriptions: []}}
+    next_attempt = state.reconnect_attempt + 1
+    delay = BotArmyRuntime.NATS.Connection.calculate_backoff(state.reconnect_attempt, 1000)
+
+    Logger.warning(
+      "Terrain disconnected from NATS, will reconnect in #{delay}ms (attempt #{next_attempt})"
+    )
+
+    Process.send_after(self(), :connect_retry, delay)
+    {:noreply, %{state | subscriptions: [], reconnect_attempt: next_attempt}}
   end
 
   @impl true
   def handle_info({:nats, :connected}, state) do
     Logger.info("Terrain reconnected to NATS, re-subscribing")
-    {:noreply, state, {:continue, :connect}}
+    {:noreply, %{state | reconnect_attempt: 0}, {:continue, :connect}}
   end
 
   @impl true
