@@ -21,8 +21,6 @@ config :bot_army_terrain, BotArmyTerrain.Repo,
     System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") || System.get_env("DATABASE_PASSWORD") ||
       "postgres",
   pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer(),
-
-
   ssl: false
 
 # Learning library configuration (uses same database as this bot)
@@ -44,8 +42,6 @@ config :bot_army_library_learning, BotArmyLearning.Repo,
     System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") || System.get_env("DATABASE_PASSWORD") ||
       "postgres",
   pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer(),
-
-
   ssl: false
 
 # Graph database configuration at runtime (postgres-age, port 30002)
@@ -55,5 +51,4 @@ config :bot_army_terrain, BotArmyTerrain.GraphRepo,
   username: System.get_env("GRAPHDB_USER", "postgres"),
   password: System.get_env("GRAPHDB_PASSWORD", "postgres"),
   database: System.get_env("GRAPHDB_NAME", "ergon_graphdb_terrain"),
-  pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer(),
-
+  pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer()
