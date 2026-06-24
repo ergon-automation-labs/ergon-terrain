@@ -36,18 +36,21 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
       {:ok, entries} ->
         # Check if this is a single track directory (contains .yaml/.yml files)
         # or a parent directory (contains subdirectories)
-        has_yaml_files = Enum.any?(entries, fn entry ->
-          String.ends_with?(entry, ".yaml") or String.ends_with?(entry, ".yml")
-        end)
+        has_yaml_files =
+          Enum.any?(entries, fn entry ->
+            String.ends_with?(entry, ".yaml") or String.ends_with?(entry, ".yml")
+          end)
 
         if has_yaml_files do
           # Single track directory: use directory name as track name
           track_name = Path.basename(base_path)
+
           case import_track_directory(track_name, base_path) do
             {:ok, result} ->
               Logger.info(
                 "Terrain: imported track '#{result.track}' with #{result.lessons_imported} lesson(s)"
               )
+
               {:ok, %{tracks_imported: 1, lessons_imported: result.lessons_imported}}
 
             {:error, reason} ->
@@ -205,8 +208,10 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
           generated_at: DateTime.utc_now(:microsecond)
         }
 
-        case LessonStore.store_lesson(attrs) do
-          {:ok, _} -> :ok
+        case LessonStore.store_lesson(BotArmyCore.Tenant.default_tenant_id(), attrs) do
+          {:ok, _} ->
+            :ok
+
           {:error, reason} ->
             Logger.warning("Failed to create lesson from #{lesson_path}: #{inspect(reason)}")
             :skip
@@ -223,6 +228,7 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
     # SHA256 hash, take first 16 bytes, format as UUID string (32+16+16+16+48 bits = 16 bytes)
     hash = :crypto.hash(:sha256, lesson_path)
     <<a::32, b::16, c::16, d::16, e::48>> = binary_part(hash, 0, 16)
+
     "#{Base.encode16(<<a::32>>, case: :lower)}-#{Base.encode16(<<b::16>>, case: :lower)}-#{Base.encode16(<<c::16>>, case: :lower)}-#{Base.encode16(<<d::16>>, case: :lower)}-#{Base.encode16(<<e::48>>, case: :lower)}"
   end
 
@@ -277,7 +283,8 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
         "question" => stem,
         "options" => options,
         "correct_index" => correct_index,
-        "difficulty" => normalize_question_difficulty(Map.get(question, "difficulty"), lesson_difficulty)
+        "difficulty" =>
+          normalize_question_difficulty(Map.get(question, "difficulty"), lesson_difficulty)
       }
     else
       nil

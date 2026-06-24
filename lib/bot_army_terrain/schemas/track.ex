@@ -12,27 +12,40 @@ defmodule BotArmyTerrain.Schemas.Track do
   @foreign_key_type :binary_id
 
   schema "tracks" do
-    field :user_id, :binary_id
-    field :name, :string
-    field :description, :string
-    field :color, :string
-    field :icon, :string
-    field :status, :string
-    field :card_count, :integer
-    field :chunk_count, :integer
-    field :xp, :integer
+    field(:tenant_id, :binary_id)
+    field(:user_id, :binary_id)
+    field(:name, :string)
+    field(:description, :string)
+    field(:color, :string)
+    field(:icon, :string)
+    field(:status, :string)
+    field(:card_count, :integer)
+    field(:chunk_count, :integer)
+    field(:xp, :integer)
 
     timestamps(type: :utc_datetime_usec)
   end
 
   @required [:name]
-  @optional [:user_id, :description, :color, :icon, :status, :card_count, :chunk_count, :xp]
+  @optional [
+    :tenant_id,
+    :user_id,
+    :description,
+    :color,
+    :icon,
+    :status,
+    :card_count,
+    :chunk_count,
+    :xp
+  ]
 
   def changeset(track, attrs) do
     track
     |> cast(attrs, @required ++ @optional)
     |> validate_required(@required)
-    |> validate_inclusion(:status, ~w(active paused archived), message: "must be active, paused, or archived")
+    |> validate_inclusion(:status, ~w(active paused archived),
+      message: "must be active, paused, or archived"
+    )
     |> default_status()
     |> default_counts()
   end
