@@ -24,7 +24,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
 
       {:error, :nats_unavailable} ->
         # NATS not available — fall back to demo lesson generated synchronously
-        demo = build_demo_lesson(chunk_id, chunk_title)
+        demo = build_demo_lesson(tenant_id, chunk_id, chunk_title)
         {:ok, demo}
 
       {:error, reason} ->
@@ -87,7 +87,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
 
   Expects format with single-line fields like TITLE:, EXTERNAL_LINK:, etc.
   EXPLANATION field may span multiple lines.
-  Returns attrs map ready for LessonStore.store_lesson/1.
+  Returns attrs map ready for LessonStore.store_lesson/2.
   """
   def parse_llm_text(text) do
     lines = String.split(text, "\n")
@@ -127,6 +127,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
     end
 
     quiz_question = extract.("QUIZ_QUESTION")
+
     quiz_options = [
       extract.("OPTION_1"),
       extract.("OPTION_2"),
@@ -196,8 +197,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
     """
   end
 
-
-  defp build_demo_lesson(chunk_id, chunk_title) do
+  defp build_demo_lesson(tenant_id, chunk_id, chunk_title) do
     demo_explanation =
       "This lesson explains #{chunk_title}.\n\n" <>
         "Key points:\n" <>
@@ -232,9 +232,12 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
           "difficulty" => 2
         }
       ],
-      "host_intro" => "Let's test your understanding of #{chunk_title}! The stakes are high and your dignity is on the line.",
-      "host_correct" => "Well done! You clearly understand #{chunk_title} better than your fellow contestants.",
-      "host_wrong" => "Oh fascinating choice. Tragically, also wrong. #{chunk_title} is a core concept — perhaps the dojo will help.",
+      "host_intro" =>
+        "Let's test your understanding of #{chunk_title}! The stakes are high and your dignity is on the line.",
+      "host_correct" =>
+        "Well done! You clearly understand #{chunk_title} better than your fellow contestants.",
+      "host_wrong" =>
+        "Oh fascinating choice. Tragically, also wrong. #{chunk_title} is a core concept — perhaps the dojo will help.",
       "npc_players" => [
         %{"name" => "Confused Carl", "answer_index" => 1},
         %{"name" => "Overconfident Owen", "answer_index" => 2}
@@ -242,7 +245,7 @@ defmodule BotArmyTerrain.Handlers.LessonHandler do
       "generated_at" => DateTime.utc_now()
     }
 
-    case BotArmyTerrain.LessonStore.store_lesson(attrs) do
+    case BotArmyTerrain.LessonStore.store_lesson(tenant_id, attrs) do
       {:ok, lesson} ->
         %{
           "chunk_id" => chunk_id,
