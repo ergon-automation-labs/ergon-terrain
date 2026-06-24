@@ -19,7 +19,12 @@ defmodule BotArmyTerrain.LessonStore do
 
   @doc "Store or update a lesson. Upserts by chunk_id, scoped to tenant."
   def store_lesson(tenant_id, attrs) do
-    attrs = Map.put(attrs, "tenant_id", tenant_id)
+    # Normalize to string keys so atom-keyed callers (directory importer) and
+    # string-keyed callers (system_challenge_build) both cast cleanly.
+    attrs =
+      attrs
+      |> Map.new(fn {k, v} -> {to_string(k), v} end)
+      |> Map.put("tenant_id", tenant_id)
 
     %Lesson{}
     |> Lesson.changeset(attrs)
