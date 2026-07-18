@@ -9,10 +9,10 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
   alias BotArmyTerrain.GameStateStore
   alias BotArmyTerrain.LessonStore
   alias BotArmyTerrain.Handlers.GameGenerationHandler
-  alias BotArmyRuntime.NATS.Connection
+  alias BotArmyLibraryRuntime.NATS.Connection
 
   def handle_completion(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
     payload = message["payload"] || %{}
     source_metadata = message["source_metadata"] || %{}
 
@@ -27,14 +27,14 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
 
     case {phase, Jason.decode(json_text)} do
       {"game", {:ok, game_json}} ->
-        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_phase_parsed", 1,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_phase_parsed", 1,
           metadata: %{track_id: track_id, tenant_id: tenant_id}
         )
 
         handle_game_phase_complete(tenant_id, user_id, track_id, game_json)
 
       {"dojo", {:ok, dojo_json}} ->
-        BotArmyRuntime.Outcomes.emit("terrain", "generation", "dojo_phase_parsed", 1,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "dojo_phase_parsed", 1,
           metadata: %{track_id: track_id, tenant_id: tenant_id}
         )
 
@@ -54,7 +54,7 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
           "user_id" => user_id
         })
 
-        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_parse_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_parse_failed", 0,
           metadata: %{
             track_id: track_id,
             phase: phase,
@@ -108,7 +108,7 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
 
         Logger.info("Terrain: game generation completed for track #{track_id}")
 
-        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_completed", 1,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_completed", 1,
           metadata: %{track_id: track_id, tenant_id: tenant_id}
         )
 
@@ -124,7 +124,7 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
           "user_id" => user_id
         })
 
-        BotArmyRuntime.Outcomes.emit("terrain", "generation", "game_generation_store_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_store_failed", 0,
           metadata: %{track_id: track_id, tenant_id: tenant_id, reason: inspect(reason)}
         )
     end

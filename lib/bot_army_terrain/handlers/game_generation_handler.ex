@@ -5,7 +5,7 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
   """
 
   require Logger
-  alias BotArmyRuntime.NATS.Connection
+  alias BotArmyLibraryRuntime.NATS.Connection
 
   @doc """
   Generate game structure (questions, branching, difficulty, bonuses).

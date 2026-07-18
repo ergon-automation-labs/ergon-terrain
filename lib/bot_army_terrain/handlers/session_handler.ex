@@ -7,15 +7,15 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
 
   @doc "Handle session start request, returns {session_id}."
   def handle_start(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
 
     with {:ok, track_id} <- extract_track_id(message),
          {:ok, session} <- create_session(tenant_id, track_id) do
-      BotArmyRuntime.Outcomes.emit("terrain", "session", "session_started", 1,
+      BotArmyLibraryRuntime.Outcomes.emit("terrain", "session", "session_started", 1,
         metadata: %{session_id: session.id, track_id: track_id, tenant_id: tenant_id}
       )
 
-      BotArmyRuntime.NATS.Reply.ok(%{
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{
         "session_id" => session.id,
         "tenant_id" => tenant_id,
         "user_id" => user_id
@@ -24,37 +24,37 @@ defmodule BotArmyTerrain.Handlers.SessionHandler do
       {:error, reason} ->
         Logger.error("Session start failed: #{inspect(reason)}")
 
-        BotArmyRuntime.Outcomes.emit("terrain", "session", "session_start_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "session", "session_start_failed", 0,
           metadata: %{reason: inspect(reason), tenant_id: tenant_id}
         )
 
-        BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_start_failed)
+        BotArmyLibraryRuntime.NATS.Reply.error(inspect(reason), :session_start_failed)
     end
   end
 
   @doc "Handle session end request, returns stats."
   def handle_end(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
 
     with {:ok, session_id} <- extract_session_id(message),
          {:ok, stats} <- get_session_stats(tenant_id, session_id),
          :ok <- end_session_in_store(tenant_id, session_id) do
-      BotArmyRuntime.Outcomes.emit("terrain", "session", "session_ended", 1,
+      BotArmyLibraryRuntime.Outcomes.emit("terrain", "session", "session_ended", 1,
         metadata: %{session_id: session_id, tenant_id: tenant_id, stats: inspect(stats)}
       )
 
-      BotArmyRuntime.NATS.Reply.ok(
+      BotArmyLibraryRuntime.NATS.Reply.ok(
         Map.merge(stats, %{"tenant_id" => tenant_id, "user_id" => user_id})
       )
     else
       {:error, reason} ->
         Logger.error("Session end failed: #{inspect(reason)}")
 
-        BotArmyRuntime.Outcomes.emit("terrain", "session", "session_end_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit("terrain", "session", "session_end_failed", 0,
           metadata: %{reason: inspect(reason), tenant_id: tenant_id}
         )
 
-        BotArmyRuntime.NATS.Reply.error(inspect(reason), :session_end_failed)
+        BotArmyLibraryRuntime.NATS.Reply.error(inspect(reason), :session_end_failed)
     end
   end
 

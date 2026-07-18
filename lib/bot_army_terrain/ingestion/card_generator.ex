@@ -7,7 +7,7 @@ defmodule BotArmyTerrain.Ingestion.CardGenerator do
 
   require Logger
 
-  alias BotArmyRuntime.NATS.Publisher
+  alias BotArmyLibraryRuntime.NATS.Publisher
 
   # Allow mocking via Application config (for tests)
   defp chunk_store,

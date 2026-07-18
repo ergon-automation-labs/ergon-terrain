@@ -27,7 +27,7 @@ defmodule BotArmyTerrain.Release do
   end
 
   def migrate do
-    BotArmyRuntime.Ecto.MigrationRunner.run(
+    BotArmyLibraryRuntime.Ecto.MigrationRunner.run(
       repo_module: BotArmyTerrain.Repo,
       app_module: @app
     )

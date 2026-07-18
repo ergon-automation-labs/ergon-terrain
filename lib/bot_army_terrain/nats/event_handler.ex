@@ -56,7 +56,7 @@ defmodule BotArmyTerrain.NATS.EventHandler do
 
   defp get_connection do
     try do
-      GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
+      GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
     rescue
       _ -> {:error, :unavailable}
     catch

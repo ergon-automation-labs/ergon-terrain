@@ -23,7 +23,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
     - {:error, reason} on failure
   """
   def handle_submit(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
 
     with {:ok, card_id} <- extract_card_id(message),
          {:ok, quality} <- extract_quality(message),
@@ -37,7 +37,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandler do
       try do
         was_successful = quality >= 3
 
-        BotArmyLearning.OutcomeTracker.record(
+        BotArmyLibraryLearning.OutcomeTracker.record(
           card_id,
           "terrain.card_review",
           "act",

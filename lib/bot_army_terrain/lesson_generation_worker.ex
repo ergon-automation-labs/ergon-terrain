@@ -12,7 +12,7 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
   require Logger
 
   alias BotArmyTerrain.Handlers.LessonHandler
-  alias BotArmyRuntime.NATS.Envelope
+  alias BotArmyLibraryRuntime.NATS.Envelope
 
   # Queue structure: %{chunk_id => {chunk_title, chunk_content, retries}}
   defmodule State do
@@ -167,7 +167,7 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
     # Returns {:ok, :submitted} if LLM request succeeded
     # Returns {:ok, demo_lesson} if NATS unavailable (falls back to synchronous demo)
     # Returns {:error, reason} on submission failure
-    default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+    default_tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
     case LessonHandler.generate_lesson(default_tenant_id, chunk_id, chunk_title, chunk_content) do
       {:ok, :submitted} ->
@@ -220,7 +220,7 @@ defmodule BotArmyTerrain.LessonGenerationWorker do
 
   defp get_connection do
     try do
-      GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
+      GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
     rescue
       _ -> {:error, :unavailable}
     catch

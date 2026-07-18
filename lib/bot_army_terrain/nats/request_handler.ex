@@ -65,7 +65,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   def handle_continue(:connect, state) do
     case get_connection() do
       {:ok, conn} ->
-        BotArmyRuntime.Health.Responder.register_subjects(@subjects)
+        BotArmyLibraryRuntime.Health.Responder.register_subjects(@subjects)
         subscribe(conn, state)
 
       {:error, _} ->
@@ -108,7 +108,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp get_connection do
     try do
-      GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
+      GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
     rescue
       _ -> {:error, :unavailable}
     catch
@@ -186,7 +186,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         }
       end)
 
-    BotArmyRuntime.NATS.Reply.ok(%{"tracks" => track_list})
+    BotArmyLibraryRuntime.NATS.Reply.ok(%{"tracks" => track_list})
   end
 
   defp handle_request("terrain.tracks.import", msg) do
@@ -195,10 +195,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     cond do
       is_nil(path) ->
-        BotArmyRuntime.NATS.Reply.error("path required", :missing_path)
+        BotArmyLibraryRuntime.NATS.Reply.error("path required", :missing_path)
 
       not File.exists?(resolved_path) ->
-        BotArmyRuntime.NATS.Reply.error("file not found: #{resolved_path}", :file_not_found)
+        BotArmyLibraryRuntime.NATS.Reply.error("file not found: #{resolved_path}", :file_not_found)
 
       File.dir?(resolved_path) ->
         # Queue directory import asynchronously to avoid blocking RequestHandler
@@ -215,7 +215,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
             end
           end)
 
-        BotArmyRuntime.NATS.Reply.ok(%{
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{
           "status" => "queued",
           "requested_path" => path,
           "resolved_path" => resolved_path,
@@ -237,7 +237,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
             end
           end)
 
-        BotArmyRuntime.NATS.Reply.ok(%{
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{
           "status" => "queued",
           "requested_path" => path,
           "resolved_path" => resolved_path,
@@ -266,9 +266,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           }
         end)
 
-      BotArmyRuntime.NATS.Reply.ok(%{"cards" => card_list})
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{"cards" => card_list})
     else
-      BotArmyRuntime.NATS.Reply.error("track_id required", :missing_track_id)
+      BotArmyLibraryRuntime.NATS.Reply.error("track_id required", :missing_track_id)
     end
   end
 
@@ -292,11 +292,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         )
 
       case store.get_session_stats(session_id) do
-        {:ok, stats} -> BotArmyRuntime.NATS.Reply.ok(stats)
-        {:error, reason} -> BotArmyRuntime.NATS.Reply.error(inspect(reason), :stats_error)
+        {:ok, stats} -> BotArmyLibraryRuntime.NATS.Reply.ok(stats)
+        {:error, reason} -> BotArmyLibraryRuntime.NATS.Reply.error(inspect(reason), :stats_error)
       end
     else
-      BotArmyRuntime.NATS.Reply.error("session_id required", :missing_session_id)
+      BotArmyLibraryRuntime.NATS.Reply.error("session_id required", :missing_session_id)
     end
   end
 
@@ -307,7 +307,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     if card_id do
       case CardStore.get_card(card_id) do
         nil ->
-          BotArmyRuntime.NATS.Reply.error("card not found", :card_not_found)
+          BotArmyLibraryRuntime.NATS.Reply.error("card not found", :card_not_found)
 
         card ->
           if card.embedding_vector do
@@ -324,13 +324,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
                 }
               end)
 
-            BotArmyRuntime.NATS.Reply.ok(%{"cards" => card_list})
+            BotArmyLibraryRuntime.NATS.Reply.ok(%{"cards" => card_list})
           else
-            BotArmyRuntime.NATS.Reply.error("card not embedded yet", :card_not_embedded)
+            BotArmyLibraryRuntime.NATS.Reply.error("card not embedded yet", :card_not_embedded)
           end
       end
     else
-      BotArmyRuntime.NATS.Reply.error("card_id required", :missing_card_id)
+      BotArmyLibraryRuntime.NATS.Reply.error("card_id required", :missing_card_id)
     end
   end
 
@@ -343,13 +343,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       # Queue for background generation
       BotArmyTerrain.LessonGenerationWorker.queue_lesson(chunk_id, chunk_title, chunk_content)
 
-      BotArmyRuntime.NATS.Reply.ok(%{
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{
         "queued" => true,
         "chunk_id" => chunk_id,
         "message" => "Lesson generation queued"
       })
     else
-      BotArmyRuntime.NATS.Reply.error(
+      BotArmyLibraryRuntime.NATS.Reply.error(
         "chunk_id, chunk_title, and chunk_content required",
         :missing_fields
       )
@@ -358,14 +358,14 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp handle_request("terrain.lesson.get", msg) do
     chunk_id = msg["chunk_id"]
-    tenant_id = msg["tenant_id"] || BotArmyCore.Tenant.default_tenant_id()
+    tenant_id = msg["tenant_id"] || BotArmyLibraryCore.Tenant.default_tenant_id()
 
     case BotArmyTerrain.LessonStore.get_lesson_by_chunk(tenant_id, chunk_id) do
       nil ->
-        BotArmyRuntime.NATS.Reply.error("lesson not found", :lesson_not_found)
+        BotArmyLibraryRuntime.NATS.Reply.error("lesson not found", :lesson_not_found)
 
       lesson ->
-        BotArmyRuntime.NATS.Reply.ok(%{
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{
           "chunk_id" => lesson.chunk_id,
           "title" => lesson.title,
           "explanation" => lesson.explanation,
@@ -385,7 +385,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_request("terrain.lesson.list", msg) do
-    tenant_id = msg["tenant_id"] || BotArmyCore.Tenant.default_tenant_id()
+    tenant_id = msg["tenant_id"] || BotArmyLibraryCore.Tenant.default_tenant_id()
     lessons = BotArmyTerrain.LessonStore.list_lessons(tenant_id)
 
     lesson_list =
@@ -400,7 +400,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         }
       end)
 
-    BotArmyRuntime.NATS.Reply.ok(%{
+    BotArmyLibraryRuntime.NATS.Reply.ok(%{
       "lessons" => lesson_list
     })
   end
@@ -410,14 +410,14 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     cond do
       is_nil(track_id) ->
-        BotArmyRuntime.NATS.Reply.error("track_id required", :missing_track_id)
+        BotArmyLibraryRuntime.NATS.Reply.error("track_id required", :missing_track_id)
 
       is_nil(TrackStore.get_track(track_id)) ->
-        BotArmyRuntime.NATS.Reply.error("track not found", :track_not_found)
+        BotArmyLibraryRuntime.NATS.Reply.error("track not found", :track_not_found)
 
       true ->
         BotArmyTerrain.GameGenerationWorker.queue_generation(track_id)
-        BotArmyRuntime.NATS.Reply.ok(%{"status" => "queued"})
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{"status" => "queued"})
     end
   end
 
@@ -426,7 +426,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
       nil ->
-        BotArmyRuntime.NATS.Reply.ok(%{"status" => "not_generated"})
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{"status" => "not_generated"})
 
       game_state ->
         response = %{
@@ -441,7 +441,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
             response
           end
 
-        BotArmyRuntime.NATS.Reply.ok(response)
+        BotArmyLibraryRuntime.NATS.Reply.ok(response)
     end
   end
 
@@ -450,14 +450,14 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
       %{status: "active"} = game_state ->
-        BotArmyRuntime.NATS.Reply.ok(%{
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{
           "game_json" => game_state.game_json,
           "dojo_json" => game_state.dojo_json,
           "generated_at" => DateTime.to_iso8601(game_state.generated_at)
         })
 
       _ ->
-        BotArmyRuntime.NATS.Reply.error("game not ready", :game_not_ready)
+        BotArmyLibraryRuntime.NATS.Reply.error("game not ready", :game_not_ready)
     end
   end
 
@@ -467,7 +467,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp handle_request(topic, _msg) do
     Logger.warning("Unknown request topic: #{topic}")
-    BotArmyRuntime.NATS.Reply.error("unknown topic", :unknown_topic)
+    BotArmyLibraryRuntime.NATS.Reply.error("unknown topic", :unknown_topic)
   end
 
   defp handle_event("terrain.review.submit", msg) do

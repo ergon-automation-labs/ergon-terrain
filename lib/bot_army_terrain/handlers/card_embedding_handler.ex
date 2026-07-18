@@ -11,7 +11,7 @@ defmodule BotArmyTerrain.Handlers.CardEmbeddingHandler do
 
   @doc "Handle embedding created event from LLM bot."
   def handle_embedding(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
     payload = message["payload"]
 
     case extract_embedding_data(payload) do

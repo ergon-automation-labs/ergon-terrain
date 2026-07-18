@@ -65,7 +65,7 @@ defmodule BotArmyTerrain.PulsePublisher do
         true -> "nominal"
       end
 
-    BotArmyRuntime.SynapseHealth.publish(
+    BotArmyLibraryRuntime.SynapseHealth.publish(
       source: "bot_army_terrain",
       service: "terrain",
       health_signal: health_signal
@@ -159,7 +159,7 @@ defmodule BotArmyTerrain.PulsePublisher do
         "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
       }
 
-      case GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5_000) do
+      case GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5_000) do
         {:ok, conn} ->
           case Gnat.pub(conn, "gossip.tavern.narrated", Jason.encode!(gossip)) do
             :ok ->
@@ -203,7 +203,7 @@ defmodule BotArmyTerrain.PulsePublisher do
 
   defp publish_to_nats(pulse) do
     try do
-      case GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5_000) do
+      case GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5_000) do
         {:ok, conn} ->
           json = Jason.encode!(pulse)
 

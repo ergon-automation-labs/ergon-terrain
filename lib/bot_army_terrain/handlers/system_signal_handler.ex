@@ -18,11 +18,11 @@ defmodule BotArmyTerrain.Handlers.SystemSignalHandler do
   def handle_request(_msg) do
     case compute_signal() do
       {:ok, signal} ->
-        BotArmyRuntime.NATS.Reply.ok(signal)
+        BotArmyLibraryRuntime.NATS.Reply.ok(signal)
 
       {:error, reason} ->
         Logger.error("SystemSignalHandler failed: #{inspect(reason)}")
-        BotArmyRuntime.NATS.Reply.error(inspect(reason), :signal_error)
+        BotArmyLibraryRuntime.NATS.Reply.error(inspect(reason), :signal_error)
     end
   end
 

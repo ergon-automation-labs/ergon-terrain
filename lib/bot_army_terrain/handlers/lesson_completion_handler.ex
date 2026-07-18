@@ -25,7 +25,7 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
     }
   """
   def handle_completion(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
     payload = message["payload"] || %{}
     source_metadata = message["source_metadata"] || %{}
 
@@ -117,7 +117,7 @@ defmodule BotArmyTerrain.Handlers.LessonCompletionHandler do
 
   defp get_connection do
     try do
-      GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
+      GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
     rescue
       _ -> {:error, :unavailable}
     catch

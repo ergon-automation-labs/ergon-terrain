@@ -203,7 +203,7 @@ defmodule BotArmyTerrain.Skills.SystemChallengeBuild do
     }
 
     try do
-      case GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5_000) do
+      case GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5_000) do
         {:ok, conn} ->
           case Gnat.pub(
                  conn,

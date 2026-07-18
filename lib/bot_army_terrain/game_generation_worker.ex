@@ -14,7 +14,7 @@ defmodule BotArmyTerrain.GameGenerationWorker do
   alias BotArmyTerrain.LessonStore
   alias BotArmyTerrain.GameStateStore
   alias BotArmyTerrain.Handlers.GameGenerationHandler
-  alias BotArmyRuntime.NATS.Connection
+  alias BotArmyLibraryRuntime.NATS.Connection
 
   @reconnect_delay_ms 5000
   @process_delay_ms 1000
@@ -87,7 +87,7 @@ defmodule BotArmyTerrain.GameGenerationWorker do
     with {:ok, track} <- get_track(track_id),
          {:ok, lessons} <- get_lessons(track_id) do
       unless Enum.empty?(lessons) do
-        default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+        default_tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
         GameStateStore.mark_status(default_tenant_id, track_id, "generating_game")
         emit_event("terrain.game.generation.started", %{"track_id" => track_id})
 

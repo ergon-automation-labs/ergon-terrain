@@ -64,7 +64,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
   def handle_continue(:connect, state) do
     case get_connection() do
       {:ok, conn} ->
-        BotArmyRuntime.NATS.Connection.subscribe_to_status()
+        BotArmyLibraryRuntime.NATS.Connection.subscribe_to_status()
         subscribe(conn, state)
 
       {:error, _} ->
@@ -74,7 +74,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   @impl true
   def handle_info({:msg, %{topic: topic, body: body} = msg}, state) do
-    BotArmyRuntime.Tracing.with_consumer_span(topic, Map.get(msg, :headers, []), fn ->
+    BotArmyLibraryRuntime.Tracing.with_consumer_span(topic, Map.get(msg, :headers, []), fn ->
       Logger.debug("Terrain received NATS: #{topic}")
 
       case decode(body) do
@@ -94,7 +94,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
   @impl true
   def handle_info({:nats, :disconnected}, state) do
     next_attempt = state.reconnect_attempt + 1
-    delay = BotArmyRuntime.NATS.Connection.calculate_backoff(state.reconnect_attempt, 1000)
+    delay = BotArmyLibraryRuntime.NATS.Connection.calculate_backoff(state.reconnect_attempt, 1000)
 
     Logger.warning(
       "Terrain disconnected from NATS, will reconnect in #{delay}ms (attempt #{next_attempt})"
@@ -125,7 +125,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   defp get_connection do
     try do
-      GenServer.call(BotArmyRuntime.NATS.Connection, :get_connection, 5000)
+      GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
     rescue
       _ -> {:error, :unavailable}
     catch
@@ -308,7 +308,7 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp register_with_retry(bot, subjects, version, status, attempts) do
-    BotArmyRuntime.Registry.register(bot, subjects, version, status)
+    BotArmyLibraryRuntime.Registry.register(bot, subjects, version, status)
     :ok
   rescue
     _e ->

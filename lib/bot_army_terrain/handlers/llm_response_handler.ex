@@ -14,7 +14,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandler do
 
   @doc "Handle a parsed LLM response message."
   def handle_parsed(message) do
-    %{tenant_id: tenant_id, user_id: user_id} = BotArmyCore.Tenant.extract_context(message)
+    %{tenant_id: tenant_id, user_id: user_id} = BotArmyLibraryCore.Tenant.extract_context(message)
     payload = message["payload"] || message
 
     # Check if this is a terrain card generation response

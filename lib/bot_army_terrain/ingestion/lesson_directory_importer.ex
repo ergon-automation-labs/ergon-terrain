@@ -208,7 +208,7 @@ defmodule BotArmyTerrain.Ingestion.LessonDirectoryImporter do
           generated_at: DateTime.utc_now(:microsecond)
         }
 
-        case LessonStore.store_lesson(BotArmyCore.Tenant.default_tenant_id(), attrs) do
+        case LessonStore.store_lesson(BotArmyLibraryCore.Tenant.default_tenant_id(), attrs) do
           {:ok, _} ->
             :ok
 

@@ -31,7 +31,7 @@ defmodule BotArmyTerrain.TrackStore do
     attrs =
       attrs
       |> Map.new(fn {k, v} -> {to_string(k), v} end)
-      |> Map.put_new("tenant_id", BotArmyCore.Tenant.default_tenant_id())
+      |> Map.put_new("tenant_id", BotArmyLibraryCore.Tenant.default_tenant_id())
 
     %Track{}
     |> Track.changeset(attrs)

@@ -66,7 +66,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporter do
 
   # Import all cards for a single track
   defp import_track(track_name, track_rows) do
-    default_tenant_id = BotArmyCore.Tenant.default_tenant_id()
+    default_tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
     with {:ok, track} <- track_store().get_or_create_track_by_name(track_name),
          {success_count, error_count} <- create_cards_for_track(default_tenant_id, track.id, track_rows) do
       if error_count > 0 do
