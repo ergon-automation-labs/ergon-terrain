@@ -15,6 +15,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   alias BotArmyTerrain.{TrackStore, CardStore, Handlers.SessionHandler}
 
   @reconnect_delay_ms 5000
+  @registry_heartbeat_ms 20_000
+  @version Mix.Project.config()[:version]
 
   @subjects [
     %{subject: "terrain.tracks.list", type: :request_reply, description: "List all tracks"},
@@ -106,6 +108,16 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     {:noreply, state, {:continue, :connect}}
   end
 
+  @impl true
+  def handle_info(:registry_heartbeat, state) do
+    if state.subscriptions != [] do
+      register_with_registry()
+      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
+    end
+
+    {:noreply, state}
+  end
+
   defp get_connection do
     try do
       GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5000)
@@ -150,10 +162,29 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       end)
 
     if Enum.all?(results, &(&1 != nil)) do
+      register_with_registry()
+      Process.send_after(self(), :registry_heartbeat, @registry_heartbeat_ms)
       {:noreply, %{state | subscriptions: results}}
     else
       schedule_reconnect(state)
     end
+  end
+
+  defp register_with_registry(attempts \\ 0)
+
+  defp register_with_registry(attempts) when attempts > 3 do
+    Logger.error("Terrain failed to register with registry")
+    :error
+  end
+
+  defp register_with_registry(attempts) do
+    deployment_status = Application.get_env(:bot_army_terrain, :deployment_status, "experimental")
+    BotArmyLibraryRuntime.Registry.register("terrain", @subjects, @version, deployment_status)
+    :ok
+  rescue
+    _e ->
+      Process.sleep(100 * (attempts + 1))
+      register_with_registry(attempts + 1)
   end
 
   defp schedule_reconnect(state) do
