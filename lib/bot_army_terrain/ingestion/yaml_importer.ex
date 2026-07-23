@@ -28,13 +28,17 @@ defmodule BotArmyTerrain.Ingestion.YamlImporter do
     with {:ok, data} <- YamlElixir.read_from_file(path),
          {:ok, track} <- validate_and_create_track(data),
          {:ok, counts} <- import_chunks(track, Map.get(data, "chunks", [])) do
-      Logger.info("Terrain: imported YAML #{path} -> track #{track.name}, #{counts.imported} new, #{counts.updated} updated")
-      {:ok, %{
-        track: track.name,
-        track_id: track.id,
-        chunks_imported: counts.imported,
-        chunks_updated: counts.updated
-      }}
+      Logger.info(
+        "Terrain: imported YAML #{path} -> track #{track.name}, #{counts.imported} new, #{counts.updated} updated"
+      )
+
+      {:ok,
+       %{
+         track: track.name,
+         track_id: track.id,
+         chunks_imported: counts.imported,
+         chunks_updated: counts.updated
+       }}
     else
       {:error, reason} ->
         Logger.error("Terrain: YAML import failed #{path}: #{inspect(reason)}")
@@ -101,13 +105,17 @@ defmodule BotArmyTerrain.Ingestion.YamlImporter do
       content_hash = :crypto.hash(:sha256, combined_content) |> Base.encode16(case: :lower)
 
       # Check if chunk already exists
-      existing = Ecto.Adapters.SQL.query!(
-        BotArmyTerrain.Repo,
-        "SELECT id FROM terrain.content_chunks WHERE track_id = $1 AND content_hash = $2 LIMIT 1",
-        [track.id, content_hash]
-      )
+      existing =
+        Ecto.Adapters.SQL.query!(
+          BotArmyTerrain.Repo,
+          "SELECT id FROM terrain.content_chunks WHERE track_id = $1 AND content_hash = $2 LIMIT 1",
+          [track.id, content_hash]
+        )
+
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       attrs = %{
+        tenant_id: tenant_id,
         track_id: track.id,
         source_type: "yaml",
         source_path: "yaml_import",
@@ -120,7 +128,7 @@ defmodule BotArmyTerrain.Ingestion.YamlImporter do
         {:ok, chunk} ->
           # Queue embedding only for new chunks
           if Enum.empty?(existing.rows) do
-            EmbedWorker.queue_chunk(chunk.id)
+            EmbedWorker.queue_chunk(tenant_id, chunk.id)
             :imported
           else
             :updated

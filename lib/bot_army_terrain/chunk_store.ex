@@ -26,7 +26,9 @@ defmodule BotArmyTerrain.ChunkStore do
 
     if existing do
       existing
-      |> Ecto.Changeset.change(metadata: attrs[:metadata] || attrs["metadata"] || existing.metadata)
+      |> Ecto.Changeset.change(
+        metadata: attrs[:metadata] || attrs["metadata"] || existing.metadata
+      )
       |> Repo.update()
     else
       %ContentChunk{}
@@ -43,6 +45,14 @@ defmodule BotArmyTerrain.ChunkStore do
 
   @doc "Get chunk by id."
   def get(id), do: Repo.get(ContentChunk, id)
+
+  @doc "Get chunk by id, scoped to tenant."
+  def get(tenant_id, id) do
+    case Repo.get(ContentChunk, id) do
+      nil -> nil
+      chunk -> if chunk.tenant_id == tenant_id, do: chunk, else: nil
+    end
+  end
 
   @doc "Update chunk embedding vector after generation."
   def update_embedding(chunk_id, embedding_vector) do

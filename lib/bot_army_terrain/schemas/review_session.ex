@@ -11,18 +11,20 @@ defmodule BotArmyTerrain.Schemas.ReviewSession do
   @foreign_key_type :binary_id
 
   schema "review_sessions" do
-    field :track_id, :binary_id
-    field :state, :string, default: "active"
-    field :cards_reviewed, :integer, default: 0
-    field :cards_correct, :integer, default: 0
-    field :started_at, :utc_datetime_usec
-    field :ended_at, :utc_datetime_usec
+    field(:tenant_id, :binary_id)
+    field(:user_id, :binary_id)
+    field(:track_id, :binary_id)
+    field(:state, :string, default: "active")
+    field(:cards_reviewed, :integer, default: 0)
+    field(:cards_correct, :integer, default: 0)
+    field(:started_at, :utc_datetime_usec)
+    field(:ended_at, :utc_datetime_usec)
 
     timestamps(type: :utc_datetime_usec)
   end
 
   @required [:track_id, :started_at]
-  @optional [:state, :cards_reviewed, :cards_correct, :ended_at]
+  @optional [:tenant_id, :user_id, :state, :cards_reviewed, :cards_correct, :ended_at]
 
   def changeset(session, attrs) do
     session

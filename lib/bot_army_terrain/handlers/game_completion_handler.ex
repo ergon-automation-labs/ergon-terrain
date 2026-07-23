@@ -54,7 +54,11 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
           "user_id" => user_id
         })
 
-        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_parse_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit(
+          "terrain",
+          "generation",
+          "game_generation_parse_failed",
+          0,
           metadata: %{
             track_id: track_id,
             phase: phase,
@@ -108,7 +112,11 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
 
         Logger.info("Terrain: game generation completed for track #{track_id}")
 
-        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_completed", 1,
+        BotArmyLibraryRuntime.Outcomes.emit(
+          "terrain",
+          "generation",
+          "game_generation_completed",
+          1,
           metadata: %{track_id: track_id, tenant_id: tenant_id}
         )
 
@@ -124,7 +132,11 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
           "user_id" => user_id
         })
 
-        BotArmyLibraryRuntime.Outcomes.emit("terrain", "generation", "game_generation_store_failed", 0,
+        BotArmyLibraryRuntime.Outcomes.emit(
+          "terrain",
+          "generation",
+          "game_generation_store_failed",
+          0,
           metadata: %{track_id: track_id, tenant_id: tenant_id, reason: inspect(reason)}
         )
     end
@@ -141,7 +153,7 @@ defmodule BotArmyTerrain.Handlers.GameCompletionHandler do
     tenant_id = payload["tenant_id"]
     user_id = payload["user_id"]
 
-    case Connection.get_connection() do
+    case GenServer.call(Connection, :get_connection, 5_000) do
       {:ok, conn} ->
         envelope = %{
           "event" => event_name,

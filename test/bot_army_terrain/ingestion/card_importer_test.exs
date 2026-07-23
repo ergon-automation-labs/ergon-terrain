@@ -9,7 +9,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
 
   describe "import_string" do
     test "valid CSV with front, back, track creates cards" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       csv = """
       front,back,track
@@ -41,7 +41,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
     end
 
     test "missing card_type defaults to basic" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       csv = """
       front,back
@@ -73,7 +73,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
     end
 
     test "multi-track CSV groups correctly" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       csv = """
       front,back,track
@@ -123,7 +123,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
     end
 
     test "default track is Default when not specified" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       csv = """
       front,back
@@ -154,7 +154,7 @@ defmodule BotArmyTerrain.Ingestion.CardImporterTest do
     end
 
     test "card_type values are preserved" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       csv = """
       front,back,card_type

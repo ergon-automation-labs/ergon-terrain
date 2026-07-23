@@ -31,7 +31,6 @@ defmodule BotArmyTerrain.Application do
       |> maybe_add_game_generation_worker()
       |> maybe_add_pulse_publisher()
       |> maybe_add_outcome_tracker()
-      |> maybe_add_consumer()
       |> maybe_add_event_handler()
       |> maybe_add_request_handler()
 
@@ -99,10 +98,6 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_pulse_publisher(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.PulsePublisher, []} | children]
-  end
-
-  defp maybe_add_consumer(children) do
-    if @env == :test, do: children, else: [{BotArmyTerrain.TerrainBot, []} | children]
   end
 
   defp maybe_add_request_handler(children) do

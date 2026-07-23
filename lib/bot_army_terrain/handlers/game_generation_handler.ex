@@ -234,9 +234,12 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
     stem = get_q(question, "question")
     options = get_q(question, "options", [])
     correct_index = get_q(question, "correct_index")
-    difficulty = normalize_difficulty(get_q(question, "difficulty", lesson.difficulty), lesson.difficulty)
 
-    if is_binary(stem) and is_list(options) and is_integer(correct_index) and correct_index >= 0 and correct_index < length(options) do
+    difficulty =
+      normalize_difficulty(get_q(question, "difficulty", lesson.difficulty), lesson.difficulty)
+
+    if is_binary(stem) and is_list(options) and is_integer(correct_index) and correct_index >= 0 and
+         correct_index < length(options) do
       shuffled = shuffle_question_options(options, correct_index)
 
       %{
@@ -299,7 +302,7 @@ defmodule BotArmyTerrain.Handlers.GameGenerationHandler do
   defp difficulty_label(_), do: "intermediate"
 
   defp publish_to_llm(tenant_id, user_id, track_id, phase, prompt) do
-    case Connection.get_connection() do
+    case GenServer.call(Connection, :get_connection, 5_000) do
       {:ok, conn} ->
         envelope = %{
           "event" => "llm.prompt.submit",

@@ -9,7 +9,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
 
   describe "handle_parsed" do
     test "ignores response with wrong source" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,
@@ -25,7 +25,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
     end
 
     test "ignores response with no metadata" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,
@@ -39,7 +39,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
     end
 
     test "handles valid terrain_card_generation response" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,
@@ -83,7 +83,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
     end
 
     test "handles response with card_type defaults to basic if missing" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,
@@ -127,7 +127,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
     end
 
     test "handles multiple cards" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,
@@ -169,7 +169,7 @@ defmodule BotArmyTerrain.Handlers.LlmResponseHandlerTest do
     end
 
     test "handles response without chunk_ids" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "tenant_id" => tenant_id,

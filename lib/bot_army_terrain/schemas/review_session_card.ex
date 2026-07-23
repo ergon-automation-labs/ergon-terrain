@@ -11,15 +11,17 @@ defmodule BotArmyTerrain.Schemas.ReviewSessionCard do
   @foreign_key_type :binary_id
 
   schema "review_session_cards" do
-    field :session_id, :binary_id
-    field :card_id, :binary_id
-    field :quality, :integer
-    field :elapsed_ms, :integer
-    field :reviewed_at, :utc_datetime_usec
+    field(:tenant_id, :binary_id)
+    field(:user_id, :binary_id)
+    field(:session_id, :binary_id)
+    field(:card_id, :binary_id)
+    field(:quality, :integer)
+    field(:elapsed_ms, :integer)
+    field(:reviewed_at, :utc_datetime_usec)
   end
 
   @required [:session_id, :quality, :elapsed_ms, :reviewed_at]
-  @optional [:card_id]
+  @optional [:card_id, :tenant_id, :user_id]
 
   def changeset(record, attrs) do
     record

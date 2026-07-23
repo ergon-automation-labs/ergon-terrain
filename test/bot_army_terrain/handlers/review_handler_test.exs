@@ -9,7 +9,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
 
   describe "handle_submit/1" do
     test "valid quality 4: updates card with SM-2 fields" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",
@@ -54,7 +54,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 5 (perfect): increases interval and ease factor" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",
@@ -83,7 +83,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 0 (fail): resets card to learning" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-456",
@@ -113,7 +113,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality 3 (pass): increments repetitions" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-789",
@@ -143,7 +143,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "missing card_id: returns error" do
       message = %{
         "quality" => 4,
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -153,7 +153,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     test "missing quality: returns error" do
       message = %{
         "card_id" => "card-123",
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -164,7 +164,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
       message = %{
         "card_id" => "card-123",
         "quality" => 6,
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -175,7 +175,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
       message = %{
         "card_id" => "card-123",
         "quality" => -1,
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -186,7 +186,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
       message = %{
         "card_id" => "card-123",
         "quality" => nil,
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -197,7 +197,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
       message = %{
         "card_id" => "card-123",
         "quality" => "four",
-        "tenant_id" => BotArmyCore.Tenant.default_tenant_id(),
+        "tenant_id" => BotArmyLibraryCore.Tenant.default_tenant_id(),
         "user_id" => nil
       }
 
@@ -205,7 +205,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "card not found: returns error without calling update_card" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       message = %{
         "card_id" => "nonexistent",
@@ -220,7 +220,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "update_card fails: returns error" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",
@@ -246,7 +246,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "float quality value: converts to integer" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",
@@ -273,7 +273,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality at boundaries: 0 works" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",
@@ -299,7 +299,7 @@ defmodule BotArmyTerrain.Handlers.ReviewHandlerTest do
     end
 
     test "quality at boundaries: 5 works" do
-      tenant_id = BotArmyCore.Tenant.default_tenant_id()
+      tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
 
       card = %{
         id: "card-123",

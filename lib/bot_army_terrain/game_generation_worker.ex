@@ -32,7 +32,8 @@ defmodule BotArmyTerrain.GameGenerationWorker do
   @impl true
   def init(_opts) do
     state = %{
-      queue: [],        # [{track_id, retry_count}, ...]
+      # [{track_id, retry_count}, ...]
+      queue: [],
       processing: false
     }
 
@@ -69,13 +70,23 @@ defmodule BotArmyTerrain.GameGenerationWorker do
 
           {:error, _reason} ->
             if retries < 2 do
-              Logger.warning("Terrain: retrying game generation for track #{track_id} (attempt #{retries + 2}/3)")
+              Logger.warning(
+                "Terrain: retrying game generation for track #{track_id} (attempt #{retries + 2}/3)"
+              )
+
               new_queue = rest ++ [{track_id, retries + 1}]
               Process.send_after(self(), :process_next, @reconnect_delay_ms)
               {:noreply, %{state | queue: new_queue}}
             else
-              Logger.error("Terrain: game generation failed for track #{track_id} after 3 attempts")
-              emit_event("terrain.game.generation.failed", %{"track_id" => track_id, "phase" => "game"})
+              Logger.error(
+                "Terrain: game generation failed for track #{track_id} after 3 attempts"
+              )
+
+              emit_event("terrain.game.generation.failed", %{
+                "track_id" => track_id,
+                "phase" => "game"
+              })
+
               Process.send_after(self(), :process_next, @process_delay_ms)
               {:noreply, %{state | queue: rest}}
             end
@@ -109,12 +120,13 @@ defmodule BotArmyTerrain.GameGenerationWorker do
   end
 
   defp get_lessons(track_id) do
-    lessons = LessonStore.list_lessons_by_track(track_id)
+    tenant_id = BotArmyLibraryCore.Tenant.default_tenant_id()
+    lessons = LessonStore.list_lessons_by_track(tenant_id, track_id)
     {:ok, lessons}
   end
 
   defp emit_event(event_name, payload) do
-    case Connection.get_connection() do
+    case GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5_000) do
       {:ok, conn} ->
         envelope = %{
           "event" => event_name,

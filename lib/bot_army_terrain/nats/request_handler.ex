@@ -168,12 +168,13 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     end
   end
 
-  defp handle_request("terrain.tracks.list", _msg) do
+  defp handle_request("terrain.tracks.list", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     tracks = TrackStore.list_tracks(status: "active")
 
     track_list =
       Enum.map(tracks, fn track ->
-        cards_due = CardStore.count_due_cards(track.id)
+        cards_due = CardStore.count_due_cards(tenant_id, track.id)
 
         %{
           "id" => track.id,
@@ -198,7 +199,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         BotArmyLibraryRuntime.NATS.Reply.error("path required", :missing_path)
 
       not File.exists?(resolved_path) ->
-        BotArmyLibraryRuntime.NATS.Reply.error("file not found: #{resolved_path}", :file_not_found)
+        BotArmyLibraryRuntime.NATS.Reply.error(
+          "file not found: #{resolved_path}",
+          :file_not_found
+        )
 
       File.dir?(resolved_path) ->
         # Queue directory import asynchronously to avoid blocking RequestHandler
@@ -301,11 +305,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_request("terrain.cards.similar", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     card_id = msg["card_id"]
     limit = msg["limit"] || 5
 
     if card_id do
-      case CardStore.get_card(card_id) do
+      case CardStore.get_card(tenant_id, card_id) do
         nil ->
           BotArmyLibraryRuntime.NATS.Reply.error("card not found", :card_not_found)
 
@@ -422,9 +427,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_request("terrain.game.status", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     track_id = msg["track_id"]
 
-    case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
+    case BotArmyTerrain.GameStateStore.get_by_track(tenant_id, track_id) do
       nil ->
         BotArmyLibraryRuntime.NATS.Reply.ok(%{"status" => "not_generated"})
 
@@ -446,9 +452,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_request("terrain.game.get", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     track_id = msg["track_id"]
 
-    case BotArmyTerrain.GameStateStore.get_by_track(track_id) do
+    case BotArmyTerrain.GameStateStore.get_by_track(tenant_id, track_id) do
       %{status: "active"} = game_state ->
         BotArmyLibraryRuntime.NATS.Reply.ok(%{
           "game_json" => game_state.game_json,
