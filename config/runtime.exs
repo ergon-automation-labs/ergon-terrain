@@ -3,52 +3,47 @@ import Config
 # Runtime configuration — evaluated when the app starts, not at compile time
 # This allows environment variables set by launchd/Salt to be read properly
 
-# Primary database configuration at runtime (postgres-vector, port 30003)
+# Primary database configuration at runtime (postgres-vector, port 30006)
 # Priority: BOT_ARMY_TERRAIN_DB_* (set by Salt/Jenkins) > DATABASE_* (from .env for local dev) > defaults
-config :bot_army_terrain, BotArmyTerrain.Repo,
-  database:
-    System.get_env("BOT_ARMY_TERRAIN_DB_NAME") || System.get_env("DATABASE_NAME") ||
-      "ergon_terrain",
-  hostname:
-    System.get_env("BOT_ARMY_TERRAIN_DB_HOST") || System.get_env("DATABASE_HOST") || "localhost",
-  port:
-    String.to_integer(
-      System.get_env("BOT_ARMY_TERRAIN_DB_PORT") || System.get_env("DATABASE_PORT") || "30003"
-    ),
-  username:
-    System.get_env("BOT_ARMY_TERRAIN_DB_USER") || System.get_env("DATABASE_USER") || "postgres",
-  password:
-    System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") || System.get_env("DATABASE_PASSWORD") ||
-      "postgres",
-  pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer(),
-  ssl: false
+if config_env() != :test do
+  alias BotArmyLibraryRuntime.Ecto.RuntimeDbConfig
 
-# Learning library configuration (uses same database as this bot)
-config :bot_army_library_learning, ecto_repos: [BotArmyLearning.Repo]
+  db_config =
+    RuntimeDbConfig.resolve("BOT_ARMY_TERRAIN", database: "ergon_terrain", port: 30006)
 
-config :bot_army_library_learning, BotArmyLearning.Repo,
-  database:
-    System.get_env("BOT_ARMY_TERRAIN_DB_NAME") || System.get_env("DATABASE_NAME") ||
-      "ergon_terrain",
-  hostname:
-    System.get_env("BOT_ARMY_TERRAIN_DB_HOST") || System.get_env("DATABASE_HOST") || "localhost",
-  port:
-    String.to_integer(
-      System.get_env("BOT_ARMY_TERRAIN_DB_PORT") || System.get_env("DATABASE_PORT") || "30003"
-    ),
-  username:
-    System.get_env("BOT_ARMY_TERRAIN_DB_USER") || System.get_env("DATABASE_USER") || "postgres",
-  password:
-    System.get_env("BOT_ARMY_TERRAIN_DB_PASSWORD") || System.get_env("DATABASE_PASSWORD") ||
-      "postgres",
-  pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer(),
-  ssl: false
+  config(
+    :bot_army_terrain,
+    BotArmyTerrain.Repo,
+    Keyword.merge(db_config, [
+      pool_size: RuntimeDbConfig.pool_size("BOT_ARMY_TERRAIN", 15),
+      ssl: false
+    ])
+  )
 
-# Graph database configuration at runtime (postgres-age, port 30002)
-config :bot_army_terrain, BotArmyTerrain.GraphRepo,
-  hostname: System.get_env("GRAPHDB_HOST", "localhost"),
-  port: String.to_integer(System.get_env("GRAPHDB_PORT", "30002")),
-  username: System.get_env("GRAPHDB_USER", "postgres"),
-  password: System.get_env("GRAPHDB_PASSWORD", "postgres"),
-  database: System.get_env("GRAPHDB_NAME", "ergon_graphdb_terrain"),
-  pool_size: System.get_env("BOT_POOL_SIZE", "15") |> String.to_integer()
+  # Learning library configuration (uses same database as this bot)
+  config :bot_army_library_learning, ecto_repos: [BotArmyLearning.Repo]
+
+  config(
+    :bot_army_library_learning,
+    BotArmyLearning.Repo,
+    Keyword.merge(db_config, [
+      pool_size: RuntimeDbConfig.pool_size("BOT_ARMY_TERRAIN", 15),
+      ssl: false
+    ])
+  )
+
+  # Graph database configuration at runtime (postgres-age, port 30002)
+  graph_db_config =
+    RuntimeDbConfig.resolve("BOT_ARMY_TERRAIN_GRAPH",
+      database: "ergon_graphdb_terrain",
+      port: 30002
+    )
+
+  config :bot_army_terrain,
+         BotArmyTerrain.GraphRepo,
+         Keyword.put(
+           graph_db_config,
+           :pool_size,
+           RuntimeDbConfig.pool_size("BOT_ARMY_TERRAIN_GRAPH", 15)
+         )
+end
