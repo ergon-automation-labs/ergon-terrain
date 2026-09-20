@@ -152,16 +152,9 @@ defmodule BotArmyTerrain.PulsePublisher do
       end
 
     if text do
-      gossip = %{
-        "event" => "gossip.tavern.narrated",
-        "source" => "terrain_bot",
-        "text" => text,
-        "timestamp" => DateTime.utc_now() |> DateTime.to_iso8601()
-      }
-
       case GenServer.call(BotArmyLibraryRuntime.NATS.Connection, :get_connection, 5_000) do
         {:ok, conn} ->
-          case Gnat.pub(conn, "gossip.tavern.narrated", Jason.encode!(gossip)) do
+          case Gnat.pub(conn, "gossip.tavern.narrated", Jason.encode!(gossip_envelope(text))) do
             :ok ->
               Logger.info("[PulsePublisher] Published tavern gossip")
 
@@ -222,5 +215,16 @@ defmodule BotArmyTerrain.PulsePublisher do
       e ->
         Logger.warning("[PulsePublisher] Error publishing pulse: #{inspect(e)}")
     end
+  end
+
+  @doc false
+  def gossip_envelope(text) do
+    BotArmyLibraryCore.NATS.Envelope.build(
+      "gossip.tavern.narrated",
+      %{"text" => text, "tavern" => true},
+      source: "terrain_bot",
+      triggered_by: "scheduler",
+      tenant_id: BotArmyLibraryRuntime.Tenant.default_tenant_id()
+    )
   end
 end
