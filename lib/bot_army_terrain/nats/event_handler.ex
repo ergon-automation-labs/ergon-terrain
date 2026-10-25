@@ -72,22 +72,13 @@ defmodule BotArmyTerrain.NATS.EventHandler do
       "events.llm.completion.terrain.game_generation"
     ]
 
-    subs =
-      Enum.map(subjects, fn subject ->
-        case Gnat.sub(conn, self(), subject) do
-          {:ok, sub} ->
-            Logger.info("[TerrainEventHandler] Subscribed to #{subject}")
-            sub
-
-          {:error, reason} ->
-            Logger.error(
-              "[TerrainEventHandler] Subscribe failed for #{subject}: #{inspect(reason)}"
-            )
-
-            nil
-        end
-      end)
-      |> Enum.reject(&is_nil/1)
+    # Through the Connection, so the subjects are registered against this pid
+    # and every new link re-subscribes them. This handler has no
+    # `:nats, :connected` clause, so a raw `Gnat.sub` here was a one-shot: a
+    # replaced Gnat pid left it silently deaf for the life of the daemon.
+    :ok = BotArmyLibraryRuntime.NATS.Connection.subscribe(subjects)
+    Logger.info("[TerrainEventHandler] subscribed to #{length(subjects)} subjects")
+    subs = subjects
 
     if subs != [] do
       {:noreply, %{state | subscriptions: subs}}

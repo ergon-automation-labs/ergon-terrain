@@ -148,18 +148,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.system.srs_signal"
     ]
 
-    results =
-      Enum.map(subscriptions, fn subject ->
-        case Gnat.sub(conn, self(), subject) do
-          {:ok, sub} ->
-            Logger.info("Terrain subscribed to #{subject}")
-            sub
-
-          {:error, reason} ->
-            Logger.error("Terrain subscribe to #{subject} failed: #{inspect(reason)}")
-            nil
-        end
-      end)
+    # Same as the event handler: no `:nats, :connected` clause, so the
+    # Connection must own the re-subscription. Registering the subjects against
+    # this pid is what survives a replaced Gnat link.
+    :ok = BotArmyLibraryRuntime.NATS.Connection.subscribe(subscriptions)
+    Logger.info("Terrain subscribed to #{length(subscriptions)} subjects")
+    results = subscriptions
 
     if Enum.all?(results, &(&1 != nil)) do
       register_with_registry()
