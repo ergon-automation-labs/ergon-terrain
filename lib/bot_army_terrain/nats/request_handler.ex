@@ -81,14 +81,37 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     case decode(body) do
       {:ok, msg} ->
-        response = handle_request(topic, msg)
-        send_reply(state, reply_to, response)
+        send_reply(state, reply_to, answer(topic, msg))
 
       {:error, reason} ->
         Logger.warning("Terrain decode failed: #{inspect(reason)}")
     end
 
     {:noreply, state}
+  end
+
+  # One bad read is a refused read, never a dead handler.
+  #
+  # A raise inside a `handle_request/2` clause takes the whole RequestHandler down with it —
+  # every registered read on this bot, not just the one that was asked. That has now happened
+  # twice for the same reason (a clause calling a store with the wrong arity:
+  # `terrain.game.get` with a nil track, and `terrain.session.stats` with one argument where
+  # the store takes two), and both times the symptom on the far side was not an error but
+  # **silence**: a request/reply with a dead handler simply times out. So the crash is caught
+  # here, logged with its stacktrace, and answered as a refusal the caller can show.
+  defp answer(topic, msg) do
+    handle_request(topic, msg)
+  rescue
+    error ->
+      Logger.error(
+        "Terrain request #{topic} raised: #{Exception.message(error)}\n" <>
+          Exception.format_stacktrace(__STACKTRACE__)
+      )
+
+      BotArmyLibraryRuntime.NATS.Reply.error(
+        "this read failed inside the bot",
+        :request_failed
+      )
   end
 
   @impl true
@@ -319,6 +342,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp handle_request("terrain.session.stats", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     session_id = msg["session_id"]
 
     if session_id do
@@ -329,14 +353,27 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           BotArmyTerrain.ReviewSessionStore
         )
 
-      case store.get_session_stats(session_id) do
-        {:ok, stats} -> BotArmyLibraryRuntime.NATS.Reply.ok(stats)
-        {:error, reason} -> BotArmyLibraryRuntime.NATS.Reply.error(inspect(reason), :stats_error)
+      # The store is tenant-scoped: `get_session_stats/2`, not `/1`. The clause called it with
+      # one argument, so this subject answered nothing at all — it raised
+      # `UndefinedFunctionError` and took the handler down on every ask. A session id alone is
+      # not permission to read a session.
+      case store.get_session_stats(tenant_id, session_id) do
+        {:ok, stats} ->
+          BotArmyLibraryRuntime.NATS.Reply.ok(stats)
+
+        {:error, :not_found} ->
+          BotArmyLibraryRuntime.NATS.Reply.error("no such session", :not_found)
+
+        {:error, reason} ->
+          BotArmyLibraryRuntime.NATS.Reply.error(stats_error(reason), :stats_error)
       end
     else
       BotArmyLibraryRuntime.NATS.Reply.error("session_id required", :missing_session_id)
     end
   end
+
+  defp stats_error(:unauthorized), do: "that session belongs to another house"
+  defp stats_error(other), do: "the session could not be read (#{inspect(other)})"
 
   defp handle_request("terrain.cards.similar", msg) do
     %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
