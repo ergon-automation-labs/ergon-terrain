@@ -31,8 +31,7 @@ defmodule BotArmyTerrain.Application do
       |> maybe_add_game_generation_worker()
       |> maybe_add_pulse_publisher()
       |> maybe_add_outcome_tracker()
-      |> maybe_add_event_handler()
-      |> maybe_add_request_handler()
+      |> add_nats_children(@env)
 
     opts = [strategy: :one_for_one, name: BotArmyTerrain.Supervisor]
     Supervisor.start_link(children, opts)
@@ -100,13 +99,26 @@ defmodule BotArmyTerrain.Application do
     if @env == :test, do: children, else: [{BotArmyTerrain.PulsePublisher, []} | children]
   end
 
-  defp maybe_add_request_handler(children) do
-    if @env == :test, do: children, else: [{BotArmyTerrain.NATS.RequestHandler, []} | children]
+  # The three processes that hold subscriptions. They are named in one function because the
+  # Consumer was *missing from this list*: it existed, it had command handlers, it had a
+  # subject list, and nothing ever started it — so on the host every
+  # `bot.army.terrain.command.*` publish (ingest, import_cards, generate_cards) was delivered
+  # to no subscriber and dropped, with no log line anywhere, because a publish to a subject
+  # nobody holds is not an error. Measured 2026-10-26: `/subsz` on mini showed the sixteen
+  # RequestHandler subjects and not one command subject. It is public and takes the env so a
+  # test can assert the consumer is supervised without booting a broker.
+  @doc "Broker-facing children for a given environment."
+  def nats_children(:test), do: []
+
+  def nats_children(_env) do
+    [
+      {BotArmyTerrain.NATS.Consumer, []},
+      {BotArmyTerrain.NATS.RequestHandler, []},
+      {BotArmyTerrain.NATS.EventHandler, []}
+    ]
   end
 
-  defp maybe_add_event_handler(children) do
-    if @env == :test, do: children, else: [{BotArmyTerrain.NATS.EventHandler, []} | children]
-  end
+  defp add_nats_children(children, env), do: children ++ nats_children(env)
 
   defp maybe_add_outcome_tracker(children) do
     if @env == :test,
