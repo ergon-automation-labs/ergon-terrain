@@ -67,6 +67,36 @@ cp .env.example .env  # then edit .env for DB/NATS
   { "payload": { "source_type": "csv", "path_or_blob_ref": "/path/to/deck.csv" } }
   ```
 
+- **Managing a deck (the authoring door, 0.4.0).** A deck is edited over request-reply, one
+  subject per verb — every one of them answers, none of them are fire-and-forget:
+
+  | Subject | Body | Answers |
+  |---|---|---|
+  | `terrain.tracks.list` | `{}` | `{"tracks": [...]}` |
+  | `terrain.tracks.create` | `{"name", "description"?}` | `{"track": {...}}` |
+  | `terrain.tracks.update` | `{"track_id", "name"?, "description"?}` | `{"track": {...}}` |
+  | `terrain.cards.list` | `{"track_id"}` | `{"cards": [...]}` — **every** card, not only the due ones |
+  | `terrain.cards.create` | `{"track_id", "front", "back", "card_type"?}` | `{"card": {...}}` |
+  | `terrain.cards.update` | `{"card_id", "front"?, "back"?, "card_type"?}` | `{"card": {...}}` |
+  | `terrain.cards.delete` | `{"card_id"}` | `{"deleted": true, "id": ...}` |
+
+  Three rules the door keeps, and the reasons they are rules rather than choices:
+
+    * **A blank field means "not sent", never "cleared"** — a field left out of
+      `cards.update` is left alone, and an empty string is refused by the changeset rather
+      than blanking the card.
+    * **A front is unique inside its deck** (`idx_cards_front_hash`), so `cards.create` with a
+      front that is already there answers *"a card with that front is already in this deck"*.
+      This matters for re-import too: `import_cards` is **not** idempotent for a changed back —
+      the unique index drops the row and the import still reports success.
+    * **A deck's name is checked by the handler, not the database** — there is no unique index
+      on `terrain.tracks.name`, so `tracks.create` refuses a name that is taken rather than
+      silently answering with the existing deck (`get_or_create` would).
+
+  There is deliberately **no `terrain.tracks.delete`**: the FK cascades every card in the deck
+  and nothing undoes it. Archive-via-`status` was sketched and dropped — no one asked for it
+  yet, and a subject with no user is a subject nobody exercises.
+
 - **List tracks (for Dungeon/overworld):**
 
   ```elixir

@@ -38,6 +38,30 @@ defmodule BotArmyTerrain.TrackStore do
     |> Repo.insert()
   end
 
+  @doc """
+  Rename a deck, or change its description.
+
+  `get_or_create_track_by_name/2` is the only other way a track changes, and it cannot rename
+  one — it looks a name up and returns what it found. So a deck's name was write-once until the
+  management door asked for this.
+  """
+  def update_track(%Track{} = track, attrs) do
+    track
+    |> Track.changeset(Map.new(attrs, fn {k, v} -> {to_string(k), v} end))
+    |> Repo.update()
+  end
+
+  @doc """
+  Find a deck by its exact name, or `nil`.
+
+  The management door needs this to refuse a new deck whose name is taken: `create_track/1`
+  has no unique index behind it, so without the check two decks could share one name and the
+  chips on her link would stop being distinguishable.
+  """
+  def get_by_name(name) when is_binary(name), do: Repo.get_by(Track, name: String.trim(name))
+
+  def get_by_name(_name), do: nil
+
   @doc "Find track by name (for CSV import: create track if not exists)."
   def get_or_create_track_by_name(name, opts \\ []) do
     name = to_string(name) |> String.trim()

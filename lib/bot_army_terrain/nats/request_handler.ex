@@ -27,6 +27,36 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       description: "Import track (singular)"
     },
     %{subject: "terrain.cards.due", type: :request_reply, description: "List due cards"},
+    %{
+      subject: "terrain.cards.list",
+      type: :request_reply,
+      description: "List every card in a deck (management)"
+    },
+    %{
+      subject: "terrain.cards.create",
+      type: :request_reply,
+      description: "Add one card to a deck (management)"
+    },
+    %{
+      subject: "terrain.cards.update",
+      type: :request_reply,
+      description: "Edit one card's front or back (management)"
+    },
+    %{
+      subject: "terrain.cards.delete",
+      type: :request_reply,
+      description: "Remove one card from a deck (management)"
+    },
+    %{
+      subject: "terrain.tracks.create",
+      type: :request_reply,
+      description: "Create a deck (management)"
+    },
+    %{
+      subject: "terrain.tracks.update",
+      type: :request_reply,
+      description: "Rename a deck or change its description (management)"
+    },
     %{subject: "terrain.review.submit", type: :request_reply, description: "Submit review"},
     %{
       subject: "terrain.session.start",
@@ -157,6 +187,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.tracks.import",
       "terrain.track.import",
       "terrain.cards.due",
+      "terrain.cards.list",
+      "terrain.cards.create",
+      "terrain.cards.update",
+      "terrain.cards.delete",
+      "terrain.tracks.create",
+      "terrain.tracks.update",
       "terrain.review.submit",
       "terrain.session.start",
       "terrain.session.end",
@@ -330,6 +366,169 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       BotArmyLibraryRuntime.NATS.Reply.ok(%{"cards" => card_list})
     else
       BotArmyLibraryRuntime.NATS.Reply.error("track_id required", :missing_track_id)
+    end
+  end
+
+  # ── the management door (2026-10-26) ────────────────────────────────────────────────────────
+  #
+  # Her question was "how do I manage collections and decks?", and the answer was "you cannot":
+  # `CardStore` has had `create_card`/`update_card`/`delete_card` since the beginning and nothing
+  # exposed them, a track's name was write-once (`get_or_create_track_by_name/2` looks a name up
+  # and returns it), and the only way to add a card was to import a file that already lived on
+  # this host. These six subjects are the door: a deck and the cards in it, read and written one
+  # card at a time.
+  #
+  # They are *material*, not learning. A grade stays the review subjects above; these change what
+  # there is to grade. Every one is tenant-scoped the same way the reads are, because the tenant
+  # is what keeps one house's deck out of another's.
+
+  defp handle_request("terrain.cards.list", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    case msg["track_id"] do
+      track_id when is_binary(track_id) and track_id != "" ->
+        cards = card_store().list_cards_for_track(tenant_id, track_id)
+
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{"cards" => Enum.map(cards, &card_row/1)})
+
+      _other ->
+        BotArmyLibraryRuntime.NATS.Reply.error("track_id required", :missing_track_id)
+    end
+  end
+
+  defp handle_request("terrain.cards.create", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+    track_id = msg["track_id"]
+
+    cond do
+      not is_binary(track_id) or track_id == "" ->
+        BotArmyLibraryRuntime.NATS.Reply.error("track_id required", :missing_track_id)
+
+      is_nil(track_store().get_track(track_id)) ->
+        BotArmyLibraryRuntime.NATS.Reply.error("there is no deck with that id", :track_not_found)
+
+      true ->
+        attrs = %{
+          track_id: track_id,
+          front: blank_to_nil(msg["front"]),
+          back: blank_to_nil(msg["back"]),
+          card_type: msg["card_type"] || "basic"
+        }
+
+        case card_store().create_card(tenant_id, attrs) do
+          {:ok, card} ->
+            track_store().update_card_count_from_store(tenant_id, track_id)
+            BotArmyLibraryRuntime.NATS.Reply.ok(%{"card" => card_row(card)})
+
+          {:error, changeset} ->
+            BotArmyLibraryRuntime.NATS.Reply.error(card_sentence(changeset), :card_refused)
+        end
+    end
+  end
+
+  defp handle_request("terrain.cards.update", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, card} <- find_card(tenant_id, msg["card_id"]) do
+      attrs =
+        %{}
+        |> put_present("front", msg["front"])
+        |> put_present("back", msg["back"])
+        |> put_present("card_type", msg["card_type"])
+
+      case card_store().update_card(tenant_id, card, attrs) do
+        {:ok, card} ->
+          BotArmyLibraryRuntime.NATS.Reply.ok(%{"card" => card_row(card)})
+
+        {:error, changeset} ->
+          BotArmyLibraryRuntime.NATS.Reply.error(card_sentence(changeset), :card_refused)
+      end
+    else
+      {:error, :not_found} ->
+        BotArmyLibraryRuntime.NATS.Reply.error("there is no card with that id", :card_not_found)
+    end
+  end
+
+  defp handle_request("terrain.cards.delete", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, card} <- find_card(tenant_id, msg["card_id"]),
+         {:ok, _deleted} <- card_store().delete_card(card.id) do
+      track_store().update_card_count_from_store(tenant_id, card.track_id)
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{"deleted" => true, "id" => card.id})
+    else
+      {:error, :not_found} ->
+        BotArmyLibraryRuntime.NATS.Reply.error("there is no card with that id", :card_not_found)
+
+      {:error, reason} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(
+          "the card could not be removed (#{inspect(reason)})",
+          :card_not_removed
+        )
+    end
+  end
+
+  defp handle_request("terrain.tracks.create", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+    name = msg["name"] |> to_string() |> String.trim()
+
+    cond do
+      name == "" ->
+        BotArmyLibraryRuntime.NATS.Reply.error("a deck needs a name", :missing_name)
+
+      # There is no unique index on a deck's name, so the check is here. `get_or_create` would
+      # hand back the existing deck instead of saying "this one is already here", and a press
+      # that creates nothing and answers success is the shape of lie this door is meant to end.
+      not is_nil(track_store().get_by_name(name)) ->
+        BotArmyLibraryRuntime.NATS.Reply.error(
+          "there is already a deck called #{name}",
+          :track_exists
+        )
+
+      true ->
+        attrs = %{name: name, tenant_id: tenant_id, description: blank_to_nil(msg["description"])}
+
+        case track_store().create_track(attrs) do
+          {:ok, track} ->
+            BotArmyLibraryRuntime.NATS.Reply.ok(%{"track" => track_row(track)})
+
+          {:error, changeset} ->
+            BotArmyLibraryRuntime.NATS.Reply.error(track_sentence(changeset), :track_refused)
+        end
+    end
+  end
+
+  defp handle_request("terrain.tracks.update", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+    track_id = msg["track_id"]
+
+    with track when not is_nil(track) <- track_store().get_track(track_id),
+         true <- track.tenant_id in [nil, tenant_id],
+         attrs =
+           %{}
+           |> put_present("name", msg["name"])
+           |> put_present("description", msg["description"]),
+         false <- Map.has_key?(attrs, "name") and String.trim(attrs["name"]) == "",
+         :ok <- deck_name_is_free(attrs["name"], track.id),
+         {:ok, track} <- track_store().update_track(track, attrs) do
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{"track" => track_row(track)})
+    else
+      nil ->
+        BotArmyLibraryRuntime.NATS.Reply.error("there is no deck with that id", :track_not_found)
+
+      false ->
+        BotArmyLibraryRuntime.NATS.Reply.error("a deck needs a name", :missing_name)
+
+      {:error, :track_exists} ->
+        # A rename that lands on a deck that already exists would leave two decks with one name,
+        # and the chips are the only way to tell them apart.
+        BotArmyLibraryRuntime.NATS.Reply.error(
+          "there is already a deck called #{String.trim(msg["name"])}",
+          :track_exists
+        )
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(track_sentence(changeset), :track_refused)
     end
   end
 
@@ -597,6 +796,95 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   # Maps container/TUI path prefixes to host runtime paths for bot-side file access.
   # /app/lessons_bot_army/* -> /etc/bot_army/lessons/* (bot-accessible, always works)
   # /app/lessons/* -> ${TERRAIN_LESSONS_ROOT}/* (user paths, dev default)
+  defp card_store,
+    do: Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
+
+  defp track_store,
+    do: Application.get_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStore)
+
+  defp find_card(tenant_id, card_id) when is_binary(card_id) and card_id != "" do
+    case card_store().get_card(tenant_id, card_id) do
+      nil -> {:error, :not_found}
+      card -> {:ok, card}
+    end
+  end
+
+  defp find_card(_tenant_id, _card_id), do: {:error, :not_found}
+
+  # A field that was not sent is not a field to clear: `""` from a form means "I emptied it",
+  # a missing key means "I did not touch it". Cards refuse an empty front or back, so a blank
+  # is turned into nil and refused by the changeset rather than blanking a card that has one.
+  defp put_present(attrs, _key, nil), do: attrs
+  defp put_present(attrs, key, value), do: Map.put(attrs, key, blank_to_nil(value))
+
+  defp blank_to_nil(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp blank_to_nil(value), do: value
+
+  defp deck_name_is_free(nil, _track_id), do: :ok
+
+  defp deck_name_is_free(name, track_id) do
+    case track_store().get_by_name(String.trim(name)) do
+      nil -> :ok
+      %{id: ^track_id} -> :ok
+      _other -> {:error, :track_exists}
+    end
+  end
+
+  defp card_row(card) do
+    %{
+      "id" => card.id,
+      "track_id" => card.track_id,
+      "front" => card.front,
+      "back" => card.back,
+      "card_type" => card.card_type,
+      "state" => card.state,
+      "next_review_at" => card.next_review_at && DateTime.to_iso8601(card.next_review_at)
+    }
+  end
+
+  # `Map.get/3` rather than `track.description`: the row is also built from a mock's map in
+  # tests, and a struct-only field access raises a KeyError there — which the `answer/2` rescue
+  # would turn into "this read failed inside the bot" instead of a deck.
+  defp track_row(track) do
+    %{
+      "id" => Map.get(track, :id),
+      "name" => Map.get(track, :name),
+      "description" => Map.get(track, :description),
+      "card_count" => Map.get(track, :card_count) || 0,
+      "chunk_count" => Map.get(track, :chunk_count) || 0,
+      "status" => Map.get(track, :status)
+    }
+  end
+
+  # A changeset is a struct full of field maps, and a refusal read by a person is a sentence.
+  defp card_sentence(%Ecto.Changeset{} = changeset),
+    do: sentence_from(changeset, "the card was refused")
+
+  defp card_sentence(_other), do: "the card was refused"
+
+  defp track_sentence(%Ecto.Changeset{} = changeset),
+    do: sentence_from(changeset, "the deck was refused")
+
+  defp track_sentence(_other), do: "the deck was refused"
+
+  defp sentence_from(changeset, fallback) do
+    messages =
+      changeset
+      |> Ecto.Changeset.traverse_errors(fn {message, _opts} -> message end)
+      |> Enum.flat_map(fn {_field, messages} -> messages end)
+
+    case messages do
+      [] -> fallback
+      [message | _rest] -> message
+    end
+  end
+
   defp resolve_import_path(path) when is_binary(path) do
     cond do
       String.starts_with?(path, "/app/lessons_bot_army") ->

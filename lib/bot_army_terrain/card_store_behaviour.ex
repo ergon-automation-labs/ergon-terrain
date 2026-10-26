@@ -18,4 +18,15 @@ defmodule BotArmyTerrain.CardStoreBehaviour do
   can only answer a callback the behaviour declares.
   """
   @callback list_due_cards(tenant_id :: binary, track_id :: binary, opts :: keyword) :: list
+
+  @doc """
+  Every card in one track, oldest first, scoped to tenant.
+
+  The management door reads this rather than `list_due_cards/3`: a deck is edited on the days
+  nothing is due, so a list of what is *due* is the wrong list to manage.
+  """
+  @callback list_cards_for_track(tenant_id :: binary, track_id :: binary) :: list
+
+  @doc "Remove one card by id."
+  @callback delete_card(card_id :: binary) :: {:ok, any} | {:error, any}
 end

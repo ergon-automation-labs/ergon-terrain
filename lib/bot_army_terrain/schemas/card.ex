@@ -60,6 +60,10 @@ defmodule BotArmyTerrain.Schemas.Card do
     |> validate_inclusion(:state, ~w(new learning review suspended),
       message: "must be new, learning, review, or suspended"
     )
+    |> unique_constraint([:track_id, :front],
+      name: :idx_cards_front_hash,
+      message: "a card with that front is already in this deck"
+    )
     |> set_next_review_at()
   end
 
