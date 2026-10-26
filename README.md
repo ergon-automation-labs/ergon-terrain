@@ -35,6 +35,26 @@ cp .env.example .env  # then edit .env for DB/NATS
 
 ## Usage
 
+- **Cards (what a review surface reads):** `bot.army.terrain.command.import_cards` takes
+  `{"path": "/path/to/deck.csv"}` and creates the track *and* its cards immediately — no
+  model involved. The columns are `front,back,card_type,track`; a quoted field may contain
+  commas but not newlines (`CsvParser` is line-based). Cards are what
+  `terrain.cards.due` / `terrain.review.submit` work on; `command.ingest` only makes chunks.
+
+- **The starter deck.** `priv/decks/money_making.csv` ships inside the release, so a host
+  that has the release has the deck:
+
+  ```bash
+  # on the host, against the broker that host's terrain is on
+  nats pub bot.army.terrain.command.import_cards \
+    "{\"path\": \"$(ls -d /opt/ergon/releases/terrain_bot/releases/*/lib/bot_army_terrain-*/priv/decks/money_making.csv | tail -1)\"}"
+  ```
+
+  Import is additive per row and cheap to repeat; it does not touch review state that
+  already exists. The deck lives in the release rather than in `/etc` or `/opt/ergon/decks`
+  because it is *content*, and content that is only on one host's disk is content that a
+  redeploy silently deletes.
+
 - **CLI ingest (CSV):**
 
   ```elixir
@@ -59,7 +79,7 @@ cp .env.example .env  # then edit .env for DB/NATS
 - `lib/bot_army_terrain/` — Application, Repo, TrackStore, ChunkStore
 - `lib/bot_army_terrain/schemas/` — Track, ContentChunk (Ecto schemas, prefix `terrain`)
 - `lib/bot_army_terrain/ingestion/` — CsvParser, IngestionWorker
-- `lib/bot_army_terrain/nats/` — Consumer (command.ingest)
+- `lib/bot_army_terrain/nats/` — Consumer (commands), RequestHandler (reads and writes)
 
 ## Release
 

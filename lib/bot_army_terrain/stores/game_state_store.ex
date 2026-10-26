@@ -14,7 +14,18 @@ defmodule BotArmyTerrain.GameStateStore do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @doc "Get game state for a track, scoped to tenant (or nil if not generated)."
+  @doc """
+  Get game state for a track, scoped to tenant (or nil if not generated).
+
+  A request that arrives without a `track_id` asks for no track at all. `Repo.get_by/2`
+  refuses `nil` in a comparison (`nil given for :track_id`), and this clause used to hand it
+  one — so a single malformed `terrain.game.get` terminated the RequestHandler GenServer,
+  which is the process every other read on this bot goes through (measured 2026-10-26 in
+  `/var/log/bot_army/terrain_bot.err`). Returning nil is the same answer the caller would
+  get for a track with no game state, which is what "no track was named" means here.
+  """
+  def get_by_track(_tenant_id, nil), do: nil
+
   def get_by_track(tenant_id, track_id) do
     case Repo.get_by(GameState, track_id: track_id) do
       nil -> nil
@@ -25,6 +36,7 @@ defmodule BotArmyTerrain.GameStateStore do
   @doc "Create or update game state (upsert by track_id), scoped to tenant."
   def upsert(tenant_id, attrs) do
     attrs = Map.put(attrs, :tenant_id, tenant_id)
+
     %GameState{}
     |> GameState.changeset(attrs)
     |> Repo.insert(

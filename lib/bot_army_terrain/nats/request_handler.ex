@@ -280,11 +280,20 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     handle_request("terrain.tracks.import", msg)
   end
 
+  # `list_due_cards/3` is tenant-scoped and takes the tenant *first*. This clause used to
+  # call `list_due_cards(track_id, limit: 20)`, which matched the default-argument arity
+  # and put the track where the tenant belongs and `[limit: 20]` where the track belongs —
+  # so every call to this subject raised inside the query builder rather than answering.
+  # Nothing called it until the maid's panel did (2026-10-26), which is why the defect
+  # survived: no test exercised the clause either. The store is read through the app env
+  # now, like every other handler here, so the clause can be tested without a database.
   defp handle_request("terrain.cards.due", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
     track_id = msg["track_id"]
 
     if track_id do
-      cards = CardStore.list_due_cards(track_id, limit: 20)
+      store = Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
+      cards = store.list_due_cards(tenant_id, track_id, limit: 20)
 
       card_list =
         Enum.map(cards, fn card ->
