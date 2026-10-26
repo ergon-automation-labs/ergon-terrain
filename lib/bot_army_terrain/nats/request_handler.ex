@@ -506,17 +506,43 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     BotArmyTerrain.Handlers.SystemSignalHandler.handle_request(msg)
   end
 
+  # A review that carries a reply address is answered.
+  #
+  # It was not: the subject sat in `@subjects` above declared `:request_reply`, and yet only
+  # the no-reply clause reached the handler, so a caller that *waited* for the ack fell
+  # through to the catch-all below and was told `unknown_topic` — while the identical payload
+  # published without a reply address recorded the review perfectly. The maid's panel waits,
+  # because a page that has to re-read the deck to learn whether its own write landed is a
+  # page guessing about a race it can see. Both shapes now reach the same handler.
+  defp handle_request("terrain.review.submit", msg) do
+    case record_review(msg) do
+      :ok -> BotArmyLibraryRuntime.NATS.Reply.ok(%{"reviewed" => true})
+      {:error, reason} -> BotArmyLibraryRuntime.NATS.Reply.error(review_error(reason), reason)
+    end
+  end
+
   defp handle_request(topic, _msg) do
     Logger.warning("Unknown request topic: #{topic}")
     BotArmyLibraryRuntime.NATS.Reply.error("unknown topic", :unknown_topic)
   end
 
   defp handle_event("terrain.review.submit", msg) do
-    case BotArmyTerrain.Handlers.ReviewHandler.handle_submit(msg) do
+    case record_review(msg) do
       :ok -> :ok
       {:error, reason} -> Logger.error("Review submit failed: #{inspect(reason)}")
     end
   end
+
+  defp record_review(msg), do: BotArmyTerrain.Handlers.ReviewHandler.handle_submit(msg)
+
+  # The refusal is read by a person on the card, so it is a sentence and not a term: an
+  # `inspect/1` of `{:error, :card_not_found}` on her screen is the same defect the rpg
+  # panel had (2026-10-26).
+  defp review_error(:missing_card_id), do: "the press named no card"
+  defp review_error(:card_not_found), do: "that card is no longer in the deck"
+  defp review_error(:missing_quality), do: "the press carried no rating"
+  defp review_error(:invalid_quality), do: "the rating was not one of the four"
+  defp review_error(other), do: "the review was not recorded (#{inspect(other)})"
 
   defp send_reply(_state, reply_to, response) do
     case get_connection() do
