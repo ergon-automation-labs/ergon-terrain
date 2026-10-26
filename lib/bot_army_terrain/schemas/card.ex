@@ -30,6 +30,11 @@ defmodule BotArmyTerrain.Schemas.Card do
     field(:embedding_vector, Pgvector.Ecto.Vector)
     field(:embedded_at, :utc_datetime_usec)
 
+    # Removal is a mark, not a delete: the row keeps its review history, so putting a card back
+    # restores what she knew about it rather than starting it over. Every read filters this —
+    # see `CardStore` — so a removed card is invisible everywhere the deck is read.
+    field(:deleted_at, :utc_datetime_usec)
+
     timestamps(type: :utc_datetime_usec)
   end
 
@@ -47,7 +52,8 @@ defmodule BotArmyTerrain.Schemas.Card do
     :last_reviewed_at,
     :state,
     :embedding_vector,
-    :embedded_at
+    :embedded_at,
+    :deleted_at
   ]
 
   def changeset(card, attrs) do

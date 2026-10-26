@@ -27,6 +27,14 @@ defmodule BotArmyTerrain.CardStoreBehaviour do
   """
   @callback list_cards_for_track(tenant_id :: binary, track_id :: binary) :: list
 
-  @doc "Remove one card by id."
+  @doc "Remove one card by id — a mark, not a delete; `restore_card/2` puts it back."
   @callback delete_card(card_id :: binary) :: {:ok, any} | {:error, any}
+
+  @doc """
+  Put a removed card back on its deck, scoped to tenant.
+
+  The undo the management page draws after a removal. It clears the mark the delete set, so the
+  row that comes back is the row that left: its scheduling, its history, its id.
+  """
+  @callback restore_card(tenant_id :: binary, card_id :: binary) :: {:ok, any} | {:error, any}
 end

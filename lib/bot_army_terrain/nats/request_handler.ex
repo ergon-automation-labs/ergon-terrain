@@ -45,7 +45,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     %{
       subject: "terrain.cards.delete",
       type: :request_reply,
-      description: "Remove one card from a deck (management)"
+      description: "Remove one card from a deck (management; reversible)"
+    },
+    %{
+      subject: "terrain.cards.restore",
+      type: :request_reply,
+      description: "Put a removed card back on its deck (management undo)"
     },
     %{
       subject: "terrain.tracks.create",
@@ -191,6 +196,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.cards.create",
       "terrain.cards.update",
       "terrain.cards.delete",
+      "terrain.cards.restore",
       "terrain.tracks.create",
       "terrain.tracks.update",
       "terrain.review.submit",
@@ -465,6 +471,24 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           "the card could not be removed (#{inspect(reason)})",
           :card_not_removed
         )
+    end
+  end
+
+  # The undo the page draws after a removal. A card that was never removed is not an error: the
+  # answer is the card, because "it is on the deck" is what she asked for either way.
+  defp handle_request("terrain.cards.restore", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    case card_store().restore_card(tenant_id, msg["card_id"]) do
+      {:ok, card} ->
+        track_store().update_card_count_from_store(tenant_id, card.track_id)
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{"card" => card_row(card), "restored" => true})
+
+      {:error, :not_found} ->
+        BotArmyLibraryRuntime.NATS.Reply.error("there is no card with that id", :card_not_found)
+
+      {:error, changeset} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(card_sentence(changeset), :card_not_restored)
     end
   end
 

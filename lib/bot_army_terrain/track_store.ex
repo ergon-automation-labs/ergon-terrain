@@ -105,9 +105,11 @@ defmodule BotArmyTerrain.TrackStore do
   def update_card_count_from_store(tenant_id, track_id) do
     alias BotArmyTerrain.Schemas.Card
 
+    # A removed card is not on the deck, so it is not in the deck's count: the number under the
+    # deck's name has to agree with the rows the page draws, or the page is lying either way.
     count =
       from(c in Card,
-        where: c.tenant_id == ^tenant_id and c.track_id == ^track_id,
+        where: c.tenant_id == ^tenant_id and c.track_id == ^track_id and is_nil(c.deleted_at),
         select: count(c.id)
       )
       |> Repo.one()

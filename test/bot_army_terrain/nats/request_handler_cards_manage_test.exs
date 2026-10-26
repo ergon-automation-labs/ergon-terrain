@@ -171,6 +171,48 @@ defmodule BotArmyTerrain.NATS.RequestHandlerCardsManageTest do
     end
   end
 
+  # Her word, 2026-10-26: *"give her the undo for building/maintaining her own decks"*. Removal
+  # was the one press with no way back, so the deck could only be kept by someone who never
+  # made a mistake. The undo is the same row with the mark cleared.
+  describe "terrain.cards.restore" do
+    test "puts the card back and re-counts the deck" do
+      card = %{
+        id: @card,
+        track_id: @track,
+        front: "What is the deposit rule?",
+        back: "Half up front.",
+        card_type: "basic",
+        state: "review",
+        next_review_at: ~U[2026-11-02 09:00:00.000000Z]
+      }
+
+      expect(BotArmyTerrain.CardStoreMock, :restore_card, fn @tenant, @card -> {:ok, card} end)
+
+      expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, fn @tenant, @track ->
+        {:ok, %{}}
+      end)
+
+      assert {:noreply, _state} = ask("terrain.cards.restore", %{"card_id" => @card})
+    end
+
+    test "a card this house does not have is refused, and nothing is counted" do
+      expect(BotArmyTerrain.CardStoreMock, :restore_card, fn _, _ -> {:error, :not_found} end)
+      expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, 0, fn _, _ -> :ok end)
+
+      assert {:noreply, _state} = ask("terrain.cards.restore", %{"card_id" => @card})
+    end
+
+    test "a restore the store refuses is a sentence, not a crash" do
+      expect(BotArmyTerrain.CardStoreMock, :restore_card, fn _, _ ->
+        {:error, :changeset}
+      end)
+
+      expect(BotArmyTerrain.TrackStoreMock, :update_card_count_from_store, 0, fn _, _ -> :ok end)
+
+      assert {:noreply, _state} = ask("terrain.cards.restore", %{"card_id" => @card})
+    end
+  end
+
   describe "terrain.tracks.create" do
     test "creates a deck the house does not have yet" do
       expect(BotArmyTerrain.TrackStoreMock, :get_by_name, fn "Negotiating" -> nil end)

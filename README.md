@@ -67,8 +67,9 @@ cp .env.example .env  # then edit .env for DB/NATS
   { "payload": { "source_type": "csv", "path_or_blob_ref": "/path/to/deck.csv" } }
   ```
 
-- **Managing a deck (the authoring door, 0.4.0).** A deck is edited over request-reply, one
-  subject per verb — every one of them answers, none of them are fire-and-forget:
+- **Managing a deck (the authoring door, 0.4.0; removal is reversible since 0.5.0).** A deck is
+  edited over request-reply, one subject per verb — every one of them answers, none of them are
+  fire-and-forget:
 
   | Subject | Body | Answers |
   |---|---|---|
@@ -78,7 +79,8 @@ cp .env.example .env  # then edit .env for DB/NATS
   | `terrain.cards.list` | `{"track_id"}` | `{"cards": [...]}` — **every** card, not only the due ones |
   | `terrain.cards.create` | `{"track_id", "front", "back", "card_type"?}` | `{"card": {...}}` |
   | `terrain.cards.update` | `{"card_id", "front"?, "back"?, "card_type"?}` | `{"card": {...}}` |
-  | `terrain.cards.delete` | `{"card_id"}` | `{"deleted": true, "id": ...}` |
+  | `terrain.cards.delete` | `{"card_id"}` | `{"deleted": true, "id": ...}` — a **mark**, not a delete |
+  | `terrain.cards.restore` | `{"card_id"}` | `{"card": {...}, "restored": true}` — the undo |
 
   Three rules the door keeps, and the reasons they are rules rather than choices:
 
@@ -92,6 +94,18 @@ cp .env.example .env  # then edit .env for DB/NATS
     * **A deck's name is checked by the handler, not the database** — there is no unique index
       on `terrain.tracks.name`, so `tracks.create` refuses a name that is taken rather than
       silently answering with the existing deck (`get_or_create` would).
+
+    * **Removal is a mark, so it can be put back** (0.5.0). `cards.delete` sets `deleted_at`
+      instead of deleting the row, `cards.restore` clears it, and **every read filters it** — the
+      deck list, the due list, the due count, `cards.similar` and `get_card/2`. From outside,
+      removal still looks like removal. What comes back is the *same* card: same id, same FSRS
+      schedule, same review history, which is the reason this is not a page that re-creates the
+      card's words. `restore` is idempotent — a card that is already on the deck comes back as
+      `{:ok, card}`, because *"it is there"* is what was asked for either way.
+    * **The unique index is partial** — `idx_cards_front_hash` is
+      `UNIQUE (track_id, md5(front)) WHERE deleted_at IS NULL`. Without the `WHERE`, removing a
+      card would quietly poison the deck's vocabulary: the card gone, its front still refused
+      as a duplicate.
 
   There is deliberately **no `terrain.tracks.delete`**: the FK cascades every card in the deck
   and nothing undoes it. Archive-via-`status` was sketched and dropped — no one asked for it
