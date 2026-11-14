@@ -936,6 +936,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp story_store,
     do: Application.get_env(:bot_army_terrain, :story_store, BotArmyTerrain.StoryStore)
 
+  defp story_step(_tenant_id, progress, %{"redeem" => scene_id, "option" => index}, date)
+       when is_integer(index),
+       do: BotArmyTerrain.Story.redeem(progress, scene_id, index, date)
+
   defp story_step(_tenant_id, progress, %{"gate" => index}, date),
     do: BotArmyTerrain.Story.answer_gate(progress, index, date)
 
@@ -963,7 +967,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "chapter" => BotArmyTerrain.Story.chapter()["title"],
       "scene_id" => progress.scene_id,
       "mode" => Atom.to_string(mode),
-      "body" => body
+      "body" => body,
+      "note" => BotArmyTerrain.Story.redeem_note(progress, date),
+      "path" => BotArmyTerrain.Story.path(progress)
     }
   end
 
@@ -1008,6 +1014,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp story_error(:stale_scene), do: "that scene has already been played"
   defp story_error(:no_such_option), do: "that choice is not on this scene"
   defp story_error(:no_gate), do: "there is no question waiting to be answered"
+  defp story_error(:no_redemption), do: "there is no second chance waiting this morning"
   defp story_error(%Ecto.Changeset{}), do: "the story could not be saved"
   defp story_error(other), do: "the story refused (#{inspect(other)})"
 

@@ -22,6 +22,7 @@ defmodule BotArmyTerrain.Story do
   @recovered 3
   @failed_gate 1
   @gate_size 3
+  @redeem_after 2
 
   def chapter, do: @chapter
 
@@ -40,15 +41,21 @@ defmodule BotArmyTerrain.Story do
   def scene(id), do: Map.get(@chapter["scenes"], id)
 
   @doc """
-  What the page draws this morning: `{:scene, scene}`, `{:gate, outcome}`, `{:done, outcome}`
-  or `{:end, scene}`. `scene` carries the echoes the world's facts unlock.
+  What the page draws this morning: `{:scene, scene}`, `{:gate, outcome}`, `{:redeem, page}`,
+  `{:done, outcome}` or `{:end, scene}`. `scene` carries the echoes the world's facts unlock.
+
+  A redemption comes before the morning's scene and does not spend it: it is a second chance at
+  a scene she got wrong, offered once the story has moved two scenes past it (or at the chapter's
+  end), at most one attempt a day.
   """
   def today(progress, %Date{} = date) do
     scene = scene(progress.scene_id)
     outcome = progress.last_outcome || %{}
+    redeem = due_redemption(progress, date)
 
     cond do
       progress.chosen_on == date and outcome["status"] == "gate_open" -> {:gate, public(outcome)}
+      redeem -> {:redeem, redeem_view(redeem, date)}
       progress.chosen_on == date -> {:done, public(outcome)}
       scene["end"] -> {:end, view(scene, progress.facts)}
       true -> {:scene, view(scene, progress.facts)}
@@ -92,7 +99,9 @@ defmodule BotArmyTerrain.Story do
          %{} = option <- Enum.at(choice["options"], index) do
       card = choice["card"]
       facts = Map.merge(progress.facts, Map.get(option, "set", %{}))
-      log = progress.log ++ [%{"on" => Date.to_iso8601(date), "scene" => scene_id, "pick" => index}]
+      log =
+        progress.log ++
+          [entry(date, "choice", scene_id, %{"pick" => index, "correct" => option["correct"] == true})]
 
       if option["correct"] do
         progress = %{
@@ -146,6 +155,7 @@ defmodule BotArmyTerrain.Story do
          %{
            progress
            | scene_id: right["next"],
+             log: progress.log ++ [entry(date, "gate", progress.scene_id, %{"correct" => true})],
              last_outcome: %{
                "status" => "passed",
                "correct" => true,
@@ -158,7 +168,8 @@ defmodule BotArmyTerrain.Story do
         {:ok,
          %{
            progress
-           | last_outcome: %{
+           | log: progress.log ++ [entry(date, "gate", progress.scene_id, %{"correct" => false})],
+             last_outcome: %{
                "status" => "repeat",
                "correct" => false,
                "text" =>
@@ -172,6 +183,130 @@ defmodule BotArmyTerrain.Story do
       _ -> {:error, :no_gate}
     end
   end
+
+  @doc """
+  Make a redemption's choice. `index` is the position on the page, whose order is shuffled by
+  the day so a remembered position is not a remembered fact. Right: the scene's penalties are
+  undone and its reward granted (grade 4). Wrong: it waits two more scenes (grade 2).
+  """
+  def redeem(progress, scene_id, index, %Date{} = date) do
+    with ^scene_id <- due_redemption(progress, date),
+         %{"choice" => choice} <- scene(scene_id),
+         original when is_integer(original) <-
+           Enum.at(shuffle(length(choice["options"]), scene_id, date), index) do
+      option = Enum.at(choice["options"], original)
+      correct = option["correct"] == true
+      log = progress.log ++ [entry(date, "redeem", scene_id, %{"pick" => original, "correct" => correct})]
+
+      {facts, note, quality} = redeem_result(progress.facts, choice, option, correct)
+
+      last = Map.put(progress.last_outcome || %{}, "redeem", %{"on" => Date.to_iso8601(date), "text" => note})
+
+      {:ok, %{progress | facts: facts, log: log, last_outcome: last}, {choice["card"], quality}}
+    else
+      _ -> {:error, :no_redemption}
+    end
+  end
+
+  defp redeem_result(facts, choice, option, true) do
+    penalties =
+      for o <- choice["options"], !o["correct"], key <- Map.keys(Map.get(o, "set", %{})), do: key
+
+    {facts |> Map.drop(penalties) |> Map.merge(Map.get(option, "set", %{})),
+     "**Redeemed.** *You remembered.* The ship remembers too — the old damage is undone.\n\n" <>
+       option["outcome"], @knew}
+  end
+
+  defp redeem_result(facts, _choice, _option, false) do
+    {facts, "!!Not yet.!! The System files it away, *unimpressed*. **It'll be back in two scenes.**",
+     @missed}
+  end
+
+  @doc "A redemption note made today, to show above the morning's page."
+  def redeem_note(progress, %Date{} = date) do
+    case progress.last_outcome do
+      %{"redeem" => %{"on" => on, "text" => text}} -> if on == Date.to_iso8601(date), do: text
+      _ -> nil
+    end
+  end
+
+  @doc "The path so far: one line per choice, gate and redemption, oldest first."
+  def path(progress) do
+    for e <- progress.log do
+      scene = scene(e["scene"]) || %{}
+      label = with i when is_integer(i) <- e["pick"], %{"choice" => c} <- scene, %{"label" => l} <- Enum.at(c["options"], i), do: l, else: (_ -> nil)
+
+      %{
+        "on" => e["on"],
+        "kind" => e["kind"],
+        "scene" => e["scene"],
+        "title" => scene["title"],
+        "choice" => label,
+        "correct" => e["correct"]
+      }
+    end
+  end
+
+  @doc "The scene due for a second chance this morning, or nil."
+  def due_redemption(progress, %Date{} = date) do
+    today = Date.to_iso8601(date)
+    log = progress.log
+
+    if Enum.any?(log, &(&1["kind"] == "redeem" and &1["on"] == today)) do
+      nil
+    else
+      at_end = (scene(progress.scene_id) || %{})["end"] == true
+
+      log
+      |> Enum.filter(&(&1["kind"] == "choice" and &1["correct"] == false))
+      |> Enum.map(& &1["scene"])
+      |> Enum.uniq()
+      |> Enum.reject(&(&1 == progress.scene_id or redeemed?(log, &1)))
+      |> Enum.find(&(at_end or scenes_since(log, &1) >= @redeem_after))
+    end
+  end
+
+  defp redeemed?(log, scene_id),
+    do: Enum.any?(log, &(&1["kind"] == "redeem" and &1["scene"] == scene_id and &1["correct"]))
+
+  defp scenes_since(log, scene_id) do
+    anchor = log |> Enum.with_index() |> Enum.filter(fn {e, _} -> e["scene"] == scene_id end) |> List.last() |> elem(1)
+
+    log
+    |> Enum.drop(anchor + 1)
+    |> Enum.filter(&(&1["kind"] == "choice" and &1["scene"] != scene_id))
+    |> Enum.map(& &1["scene"])
+    |> Enum.uniq()
+    |> length()
+  end
+
+  defp redeem_view(scene_id, date) do
+    scene = scene(scene_id)
+    options = scene["choice"]["options"]
+
+    %{
+      "scene_id" => scene_id,
+      "title" => "Second chance — " <> scene["title"],
+      "text" =>
+        "**The System is feeling generous.** *Suspiciously* generous. It rewinds the tape to a moment you fumbled: **" <>
+          scene["title"] <> "**. Show it you learned.",
+      "terms" => scene["terms"],
+      "choice" => %{
+        "prompt" => scene["choice"]["prompt"],
+        "options" =>
+          for(i <- shuffle(length(options), scene_id, date), do: Map.take(Enum.at(options, i), ["label"]))
+      }
+    }
+  end
+
+  defp shuffle(n, scene_id, date) do
+    seed = Date.to_gregorian_days(date)
+    order = Enum.sort_by(0..(n - 1), &:erlang.phash2({&1, seed, scene_id}))
+    if order == Enum.to_list(0..(n - 1)), do: Enum.reverse(order), else: order
+  end
+
+  defp entry(date, kind, scene_id, extra),
+    do: Map.merge(%{"on" => Date.to_iso8601(date), "kind" => kind, "scene" => scene_id}, extra)
 
   defp may_choose(%{chosen_on: date}, _scene_id, date), do: {:error, :already_chosen}
   defp may_choose(%{scene_id: scene_id}, scene_id, _date), do: :ok
