@@ -22,6 +22,8 @@ help:
 	@echo ""
 	@echo "Operations (deployed server logs):"
 	@echo "  make logs            - Tail terrain_bot log with grc (brew install grc; make -C .. install-grc)"
+	@echo "  make seed-decks      - Seed decks from priv/seeds/tip_decks.json [NATS_PORT=4222 DRY_RUN=1]"
+	@echo "  make learn-card      - File one card the system wants her to learn: FRONT= BACK= [HOOK= DECK=Noticed]"
 	@echo ""
 	@echo "Release commands:"
 	@echo "  make release         - Build OTP release locally"
@@ -142,6 +144,20 @@ push-and-publish:
 
 logs:
 	@$(SCRIPTS_DIRECTORY)/tail_bot_log.sh
+
+# Seed decks (priv/seeds/tip_decks.json) through terrain's own subjects. Idempotent: existing
+# decks and cards are kept, missing hooks filled in. Defaults to the dev broker; production
+# needs NATS_PORT=4222 said out loud. DRY_RUN=1 lists what would be created.
+SEED_NATS_PORT ?= $(or $(NATS_PORT),4223)
+.PHONY: seed-decks
+seed-decks:
+	@python3 scripts/seed_decks.py --server nats://localhost:$(SEED_NATS_PORT) $(if $(FILE),--file $(FILE),) $(if $(DRY_RUN),--dry-run,)
+
+# One card, filed by the system itself (an agent noticing a fuzzy detail). DECK defaults to Noticed.
+.PHONY: learn-card
+learn-card:
+	@test -n "$(FRONT)" -a -n "$(BACK)" || { echo 'Usage: make learn-card FRONT="..." BACK="..." [HOOK="..."] [DECK=Noticed] [NATS_PORT=4222]'; exit 1; }
+	@python3 scripts/seed_decks.py --server nats://localhost:$(SEED_NATS_PORT) --deck "$(or $(DECK),Noticed)" --front "$(FRONT)" --back "$(BACK)" $(if $(HOOK),--hook "$(HOOK)",) $(if $(DRY_RUN),--dry-run,)
 
 
 # Shared targets (push, credo, pre-push-cleanup, bump-version, git-push).

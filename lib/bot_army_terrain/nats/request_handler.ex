@@ -28,6 +28,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     },
     %{subject: "terrain.cards.due", type: :request_reply, description: "List due cards"},
     %{
+      subject: "terrain.tip.today",
+      type: :request_reply,
+      description: "One card from one deck for this morning, with the words to tell it in"
+    },
+    %{
       subject: "terrain.cards.list",
       type: :request_reply,
       description: "List every card in a deck (management)"
@@ -192,6 +197,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.tracks.import",
       "terrain.track.import",
       "terrain.cards.due",
+      "terrain.tip.today",
       "terrain.cards.list",
       "terrain.cards.create",
       "terrain.cards.update",
@@ -375,6 +381,48 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     end
   end
 
+  # The tip of the day. Every deck is read, the choice is `Tip.choose/4`'s, and the reply
+  # carries the card and the words it is told in. `date` and `since` are the caller's day: a
+  # page in Denver has a different morning from UTC, and only the page knows which one it is.
+  defp handle_request("terrain.tip.today", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+    now = DateTime.utc_now()
+
+    with {:ok, date} <- tip_date(msg["date"], now),
+         {:ok, since} <- tip_since(msg["since"], date) do
+      decks =
+        track_store().list_tracks(status: "active")
+        |> Enum.map(fn track -> {track, card_store().list_cards_for_track(tenant_id, track.id)} end)
+
+      tip =
+        case BotArmyTerrain.Tip.choose(decks, date, since, now) do
+          nil ->
+            nil
+
+          %{track: track, card: card, answered: answered} ->
+            %{
+              "card_id" => card.id,
+              "track_id" => track.id,
+              "track" => track.name,
+              "front" => card.front,
+              "back" => card.back,
+              "hook" => Map.get(card, :hook),
+              "answered" => answered
+            }
+        end
+
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{
+        "date" => Date.to_iso8601(date),
+        "decks" => Enum.count(decks, fn {_t, cards} -> cards != [] end),
+        "tip" => tip,
+        "voice" => BotArmyTerrain.Tip.voice(date)
+      })
+    else
+      {:error, field} ->
+        BotArmyLibraryRuntime.NATS.Reply.error("#{field} is not a valid date", :invalid_date)
+    end
+  end
+
   # ── the management door (2026-10-26) ────────────────────────────────────────────────────────
   #
   # Her question was "how do I manage collections and decks?", and the answer was "you cannot":
@@ -418,6 +466,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           track_id: track_id,
           front: blank_to_nil(msg["front"]),
           back: blank_to_nil(msg["back"]),
+          hook: blank_to_nil(msg["hook"]),
           card_type: msg["card_type"] || "basic"
         }
 
@@ -440,6 +489,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         %{}
         |> put_present("front", msg["front"])
         |> put_present("back", msg["back"])
+        |> put_present("hook", msg["hook"])
         |> put_present("card_type", msg["card_type"])
 
       case card_store().update_card(tenant_id, card, attrs) do
@@ -820,6 +870,28 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   # Maps container/TUI path prefixes to host runtime paths for bot-side file access.
   # /app/lessons_bot_army/* -> /etc/bot_army/lessons/* (bot-accessible, always works)
   # /app/lessons/* -> ${TERRAIN_LESSONS_ROOT}/* (user paths, dev default)
+  defp tip_date(nil, now), do: {:ok, DateTime.to_date(now)}
+
+  defp tip_date(value, _now) when is_binary(value) do
+    case Date.from_iso8601(value) do
+      {:ok, date} -> {:ok, date}
+      _ -> {:error, "date"}
+    end
+  end
+
+  defp tip_date(_value, _now), do: {:error, "date"}
+
+  defp tip_since(nil, date), do: DateTime.new(date, ~T[00:00:00], "Etc/UTC")
+
+  defp tip_since(value, _date) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, since, _offset} -> {:ok, since}
+      _ -> {:error, "since"}
+    end
+  end
+
+  defp tip_since(_value, _date), do: {:error, "since"}
+
   defp card_store,
     do: Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
 
@@ -866,6 +938,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "track_id" => card.track_id,
       "front" => card.front,
       "back" => card.back,
+      "hook" => Map.get(card, :hook),
       "card_type" => card.card_type,
       "state" => card.state,
       "next_review_at" => card.next_review_at && DateTime.to_iso8601(card.next_review_at)

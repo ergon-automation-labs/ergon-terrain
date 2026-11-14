@@ -17,6 +17,7 @@ defmodule BotArmyTerrain.Schemas.Card do
     field(:chunk_id, :binary_id)
     field(:front, :string)
     field(:back, :string)
+    field(:hook, :string)
     field(:card_type, :string, default: "basic")
     field(:generation_model, :string)
 
@@ -43,6 +44,7 @@ defmodule BotArmyTerrain.Schemas.Card do
     :tenant_id,
     :user_id,
     :chunk_id,
+    :hook,
     :card_type,
     :generation_model,
     :ease_factor,

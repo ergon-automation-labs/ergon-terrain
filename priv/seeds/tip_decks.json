@@ -1,0 +1,255 @@
+{
+  "_marks": "**weight** · *motion* · !!impact!! — rendered by the surface; plain text everywhere else",
+  "decks": [
+    {
+      "name": "The System",
+      "description": "How Bot Army thinks: the rules, the design lens, and the scars behind them.",
+      "cards": [
+        {
+          "front": "Why does **every** bot change bump the version — even a comment?",
+          "back": "The version bump **is** the release signal. No bump → no GitHub release → nothing for `make deploy-bot` to deploy. And a `@moduledoc` is compiled into the BEAM, so \"only a comment\" still changes the release.",
+          "hook": "The version number is the *flag on the mast*. No new flag, and the fleet **doesn't know** the ship changed. !!No bump, no ship.!!"
+        },
+        {
+          "front": "Why do bots default to port **4223**, not 4222?",
+          "back": "Fail-safe. 4223 is the idle dev broker. A misconfigured bot lands there and runs harmlessly instead of posting bad data to production (4222). Every real deployment pins its port explicitly.",
+          "hook": "A cadet who forgets their orders reports to the *training sim*, not the **front line**. Notice how 4223 already feels like the *safe* number."
+        },
+        {
+          "front": "A deploy printed green. Is the new version running?",
+          "back": "Not proven. Salt has exited 0 over `Failed: 1`; publish has printed success without requesting a deploy. Proof is the version the service **answers with** — curl its `/health`.",
+          "hook": "The bridge officer says *\"hit confirmed\"*. The captain asks: **\"Show me the wreckage.\"** !!A green light is a claim, not a kill.!!"
+        },
+        {
+          "front": "What is the **Makefile** in a bot repo?",
+          "back": "The contract. Every operation — test, push, publish, deploy, logs — is a `make` target with its checks built in. If you're typing a sequence of three commands, it should be a target.",
+          "hook": "The Makefile is the *ship's manual*. You don't improvise the reactor startup — you **follow the checklist**, and the checklist remembers what you forget."
+        },
+        {
+          "front": "What is a NATS **subject**?",
+          "back": "A dotted name a message is sent to, like `terrain.tip.today` — domain, then noun, then verb. Request/reply subjects answer; event subjects just announce.",
+          "hook": "A subject is a *radio channel*. Tune to **terrain.tip.today** and someone *answers*. Tune to an event channel and you just **hear the news**."
+        },
+        {
+          "front": "Design lens rule #1: what beats a dashboard?",
+          "back": "**One card.** The single next action, already broken down to a small first step. A 19-item list is where ADHD goes to feel shame.",
+          "hook": "Don't hand the captain *the whole star chart*. Hand her **one heading**. !!One card.!!"
+        },
+        {
+          "front": "How does the system talk about a task that's gone stale?",
+          "back": "It asks \"still true?\" — never accuses. No broken-streak guilt, no red overdue badges, no backlog-as-indictment.",
+          "hook": "The ship's AI doesn't say *\"you failed\"*. It says **\"still true?\"** — and you *notice how much lighter* that is to answer."
+        },
+        {
+          "front": "30009 vs 30014 — which page may show **rows** like `AAPL 10 @ 150`?",
+          "back": "Only 30014. 30009 has no door, so it shows counts and health. A row that names a person, account, body or amount goes behind a door. **The door decides the row.**",
+          "hook": "The *hangar* is open to anyone walking by — so it shows **how many ships**. The *captain's cabin* has a lock — so it shows **whose**."
+        },
+        {
+          "front": "What does `rg -rn \"x\"` actually do?",
+          "back": "In ripgrep, `-r` is **--replace**, not recursive. `-rn` replaces every match with the letter `n` — the output looks plausible and is wrong. Use `rg -n` (ripgrep is already recursive).",
+          "hook": "Fourteen times the crew fired `-rn` and the scanner *quietly painted every target as \"n\"*. !!-r means replace.!! You'll **feel** your fingers stop before typing it."
+        },
+        {
+          "front": "`Registry.register/3` succeeds. What does it return?",
+          "back": "`{:ok, pid}` — not `:ok`. Two bots matched `:ok = Registry.register(...)` and crash-looped in production. (`Connection.subscribe/1` *does* return `:ok` — they look alike and aren't.)",
+          "hook": "Two calls in matching uniforms. One salutes **:ok**. The other hands you a *tuple*. Mistake them and the ship !!crash-loops!!."
+        },
+        {
+          "front": "A press would send a value. Where must the value come from?",
+          "back": "From **her** press — never from a default the card opened on. Empty choice, disabled button until every fact is chosen, and a refusal in plain words. A card once filed a workout she never described.",
+          "hook": "The form never *fills itself in and salutes*. **Her** hand sets the dial. Then the ship moves."
+        },
+        {
+          "front": "A press can't be undone. Lock it away?",
+          "back": "No — **build the undo.** Removal marks the row (`deleted_at`) and restore clears the mark, so the same card comes back with its history. Locking a door to cover a missing undo reads as distrust.",
+          "hook": "Don't *weld the airlock shut*. Install the **recall button**. !!Build the undo.!!"
+        }
+      ]
+    },
+    {
+      "name": "Kubernetes",
+      "description": "The cluster under the bot army, one concept at a time.",
+      "cards": [
+        {
+          "front": "What is a **Pod**?",
+          "back": "One or more containers sharing one network address and storage. The smallest thing Kubernetes schedules.",
+          "hook": "A *pea pod*: the peas **ride together**, share one shell, and get *thrown out together*."
+        },
+        {
+          "front": "What does the **kubelet** do?",
+          "back": "It's the agent on every node: it starts the pods assigned to that node and keeps watching them.",
+          "hook": "The control plane is the *admiral*. The kubelet is the **deck officer on each ship** who makes the orders *actually happen*."
+        },
+        {
+          "front": "Deployment vs Pod — which do you create?",
+          "back": "A **Deployment**. It declares how many copies of a pod should exist and replaces them when they die. Bare pods are rare.",
+          "hook": "You don't order one marine. You order **a squad of three** — and when one falls, *a replacement drops in*."
+        },
+        {
+          "front": "What is **desired state**?",
+          "back": "You declare what should exist; controllers keep moving reality toward it in a loop.",
+          "hook": "You say *what* you want. The control loop **nags reality** until it agrees. Very Skippy. Very *annoying*. !!Very reliable.!!"
+        },
+        {
+          "front": "What is a **NodePort** Service?",
+          "back": "A Service exposed on the same high port (30000–32767) on every node. Grafana is on **30091**, Prometheus on **30090**.",
+          "hook": "Every node has the *same numbered door* on its hull. Knock on **30091** and *Grafana* answers."
+        },
+        {
+          "front": "What does `kubectl port-forward` do?",
+          "back": "Tunnels a local port into a pod or service. It's how Postgres reaches your Mac on **35432**.",
+          "hook": "A *wormhole*, one port wide: dial **35432** at home and you *come out* inside the cluster."
+        },
+        {
+          "front": "What is a **Namespace**?",
+          "back": "A named partition inside a cluster that groups resources and scopes their names and access.",
+          "hook": "One hull, **different compartments** — engineering, medbay, the brig — with *hatches between them*."
+        },
+        {
+          "front": "A pod shows **CrashLoopBackOff**. Now what?",
+          "back": "The container keeps exiting and Kubernetes waits longer between restarts. Read the last life's logs: `kubectl logs <pod> --previous`.",
+          "hook": "It *falls*, gets up, *falls*, and the medic waits longer each time. The **previous** life's logs tell you !!why it fell!!."
+        }
+      ]
+    },
+    {
+      "name": "Trading",
+      "description": "The words the strategy loop thinks in.",
+      "cards": [
+        {
+          "front": "What does **RSI** measure?",
+          "back": "Relative Strength Index, 0–100: recent gains vs losses, usually over 14 bars. Above 70 is often called overbought, below 30 oversold.",
+          "hook": "A *tachometer* for price. Past **70** the engine is *redlining*. Under **30** it's barely idling."
+        },
+        {
+          "front": "What is a **moving-average crossover**?",
+          "back": "When a fast average (say 20-bar) crosses the slow one (say 50-bar). Crossing above suggests momentum turning up; below, turning down.",
+          "hook": "Two ships on one heading. When the *fast* one **overtakes** the slow one, !!the fleet is turning!!."
+        },
+        {
+          "front": "What is **ATR**, and why does the loop use it?",
+          "back": "Average True Range — the typical size of one bar's move. Stops are set a multiple away (e.g. 2× ATR) so normal noise doesn't hit them.",
+          "hook": "ATR is **the size of the waves**. Anchor *past* the usual wave, or ordinary chop knocks you overboard."
+        },
+        {
+          "front": "An option's premium says **2.13**. What does one contract cost?",
+          "back": "**$213.** Premiums are quoted per share and one contract is 100 shares.",
+          "hook": "The tag says **2.13**; the *box holds 100*. The system once forgot the box and every number came out !!100× too big!!."
+        },
+        {
+          "front": "What is a **paper fill**?",
+          "back": "An order filled by the simulator, not a real market. No money moves. 30014 says \"paper\" so \"filled\" doesn't pretend otherwise.",
+          "hook": "A *training round*. The trigger pulls, the target drops, and **nobody gets hurt**."
+        },
+        {
+          "front": "What is the **$25,000** goal on the trading board?",
+          "back": "The Pattern Day Trader threshold: in a margin account, 4+ day trades in 5 business days requires $25,000 in equity.",
+          "hook": "A gate at **$25,000**. Below it, *four quick round trips* in a week and !!the gate slams!!."
+        },
+        {
+          "front": "**Limit** order vs **market** order?",
+          "back": "Limit: only at your price or better, and it may not fill. Market: fills now at whatever the price is.",
+          "hook": "Limit is a *sniper* — **only at this range**. Market is a *shotgun* — **now**, wherever it lands."
+        },
+        {
+          "front": "On most days the loop answers `:wait`. Is that a failure?",
+          "back": "No. Being early is the same as being wrong. Waiting is a decision the loop records, not an absence of one.",
+          "hook": "The best captains **hold fire** until the range is right. *Wait* is an order too."
+        }
+      ]
+    },
+    {
+      "name": "Elixir",
+      "description": "The language the bots are written in.",
+      "cards": [
+        {
+          "front": "In Elixir, what does `=` do?",
+          "back": "It **matches**, it doesn't assign. `{:ok, x} = result` succeeds only if the shapes line up, binding `x` on the way.",
+          "hook": "`=` is a *docking clamp*: it only **locks on** when the shapes fit. Wrong shape — !!MatchError!!."
+        },
+        {
+          "front": "What does the pipe `|>` do?",
+          "back": "Passes the value on its left as the **first argument** of the call on its right.",
+          "hook": "A *conveyor belt*: the result **rides** to the next station and lands in *slot one*."
+        },
+        {
+          "front": "What do `{:ok, value}` and `{:error, reason}` mean?",
+          "back": "The convention for a call that can fail: success carries the value, failure carries why. Callers match on the tag.",
+          "hook": "Every mission report starts with **one word**: *ok* or *error*. Read the word first, then the cargo."
+        },
+        {
+          "front": "What is a **GenServer**?",
+          "back": "A process that holds state and answers messages — `call` (wait for a reply) and `cast` (fire and forget). Every bot store is one.",
+          "hook": "A *crew member* with a clipboard. **Call** and she answers. **Cast** and she just *notes it down*."
+        },
+        {
+          "front": "What does \"**let it crash**\" mean?",
+          "back": "Don't wrap everything defensively. If a process hits a state it can't handle, let it die — its supervisor restarts it clean.",
+          "hook": "The redshirt goes down; the **supervisor** beams down a fresh one *with a clean memory*."
+        },
+        {
+          "front": "What does `with` do?",
+          "back": "Runs a chain of matches in order. The first one that doesn't match skips to the `else` clauses.",
+          "hook": "A *series of airlocks*. Each one **must cycle green** before the next opens. One red light and you're *in the else*."
+        },
+        {
+          "front": "Can you change a map in place?",
+          "back": "No. Data is **immutable**. `Map.put/3` returns a new map; the old one is untouched.",
+          "hook": "You never *edit* the log. You write a **new entry**, and the old one *stays exactly as it was*."
+        },
+        {
+          "front": "What does `@moduledoc` compile into?",
+          "back": "The module's docs chunk inside the `.beam` file — which is why a doc-only edit still changes the release and still needs a version bump.",
+          "hook": "Even the *ship's diary* is **welded into the hull**. Change a word and !!it's a new ship!!."
+        }
+      ]
+    },
+    {
+      "name": "Greek",
+      "description": "The alphabet first, then the words of a morning.",
+      "cards": [
+        {
+          "front": "**α** — name and sound?",
+          "back": "Alpha — \"a\" as in *father*.",
+          "hook": "**α** is a *fish swimming left*. The fish says **\"ahh\"**."
+        },
+        {
+          "front": "**β** — name and sound in modern Greek?",
+          "back": "Vita — \"v\" as in *victory*.",
+          "hook": "**β** stands *tall like a Viking* — **V**ita, **V**iking, **v**."
+        },
+        {
+          "front": "**δ** — name and sound?",
+          "back": "Delta — a soft \"th\" as in *this*.",
+          "hook": "**δ** is a curl of breath — tongue *between the teeth*: **th**is."
+        },
+        {
+          "front": "**ρ** — what sound?",
+          "back": "\"r\" (rho), lightly rolled. It looks like a p and isn't.",
+          "hook": "**ρ** wears a *p costume*. Pull the mask off: it's an !!R!!."
+        },
+        {
+          "front": "**η** — what sound?",
+          "back": "\"ee\" as in *see* (ita). It looks like an n.",
+          "hook": "**η** is an *n with a long tail*, and the tail **squeaks \"ee!\"** as it drags."
+        },
+        {
+          "front": "How do you say **good morning**?",
+          "back": "Καλημέρα — *ka-lee-MEH-ra*.",
+          "hook": "**Kali** (good) + **mera** (day). Say it to the mirror *tomorrow* and notice it's **already there**."
+        },
+        {
+          "front": "What does **Ναι** mean?",
+          "back": "**Yes.** Pronounced \"neh\".",
+          "hook": "It *sounds* like \"nay\" and means !!YES!!. The language is **trolling you**. Remember the troll."
+        },
+        {
+          "front": "How do you say **thank you**?",
+          "back": "Ευχαριστώ — *ef-ha-ree-STO*.",
+          "hook": "**Eucharist** — a *giving of thanks*. Same root. **ef-ha-ree-STO**, stress at the end like a *bow*."
+        }
+      ]
+    }
+  ]
+}

@@ -7,6 +7,9 @@ defmodule BotArmyTerrain.TrackStoreBehaviour do
   @callback update_card_count_from_store(tenant_id :: String.t(), track_id :: String.t()) ::
               {:ok, any} | {:error, any}
 
+  @doc "List tracks, ordered by name (opts: status)"
+  @callback list_tracks(opts :: keyword) :: list
+
   @doc "Get a track by id, or nil"
   @callback get_track(id :: String.t()) :: any | nil
 
