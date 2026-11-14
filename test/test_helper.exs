@@ -6,9 +6,11 @@ Mox.defmock(BotArmyTerrain.CardStoreMock, for: BotArmyTerrain.CardStoreBehaviour
 Mox.defmock(BotArmyTerrain.TrackStoreMock, for: BotArmyTerrain.TrackStoreBehaviour)
 Mox.defmock(BotArmyTerrain.ReviewSessionStoreMock, for: BotArmyTerrain.ReviewSessionStoreBehaviour)
 Mox.defmock(BotArmyTerrain.EmbedWorkerMock, for: BotArmyTerrain.EmbedWorkerBehaviour)
+Mox.defmock(BotArmyTerrain.StoryStoreMock, for: BotArmyTerrain.StoryStoreBehaviour)
 
 # Configure app to use mocks in tests
 Application.put_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStoreMock)
 Application.put_env(:bot_army_terrain, :track_store, BotArmyTerrain.TrackStoreMock)
 Application.put_env(:bot_army_terrain, :review_session_store, BotArmyTerrain.ReviewSessionStoreMock)
 Application.put_env(:bot_army_terrain, :embed_worker, BotArmyTerrain.EmbedWorkerMock)
+Application.put_env(:bot_army_terrain, :story_store, BotArmyTerrain.StoryStoreMock)

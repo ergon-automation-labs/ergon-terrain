@@ -1,0 +1,140 @@
+{
+  "id": "ch1",
+  "title": "Chapter One — The Quiet Archive",
+  "start": "wake",
+  "marks": "**weight** *motion* !!impact!! `code` [[term]] — a [[term]] is a word with a card behind it",
+  "scenes": {
+    "wake": {
+      "title": "Wake Cycle",
+      "text": "The cryo-lid *hisses* open and the ship's AI is already talking.\n\n**\"Oh good, the monkey's awake.\"** VESPER — the voice of the colony ship *Long Patience* — does not sound glad. \"Three hundred years of silence, and the first thing the archive does when you thaw is *edit itself*. !!Somebody is rewriting the ship's memory.!! Naturally, I need help from the least qualified person aboard.\"\n\nThe airlock out of the cryo bay glows. Its old panel speaks Greek, because the ship's builders were sentimental. It asks one thing: *Proceed?* Two keys: **[[Ναι]]** and **Όχι**.",
+      "terms": { "Ναι": { "deck": "Greek", "front": "What does **Ναι** mean?" } },
+      "ritual": "The ship runs on its crew. **Wash your face** before the next jump — VESPER says the cabin cameras *can't take it*.",
+      "choice": {
+        "prompt": "Which key opens the airlock?",
+        "card": { "deck": "Greek", "front": "What does **Ναι** mean?" },
+        "options": [
+          { "label": "Press Ναι", "correct": true, "next": "hangar",
+            "outcome": "The airlock *sighs* open. **\"Huh,\"** says VESPER. \"It reads. Somebody fetch the Feed — the monkey reads.\"" },
+          { "label": "Press Όχι", "correct": false, "next": "hangar", "set": { "airlock_alarm": true },
+            "outcome": "!!KLAXON.!! Όχι means *no*. The airlock seals, an alarm floods the deck, and somewhere the Feed — the ship's bored audience — *howls with laughter*. You crawl out through a maintenance duct. **Everyone aboard now knows you're awake.**" }
+        ]
+      }
+    },
+    "hangar": {
+      "title": "The Hangar Board",
+      "text": "The hangar is open to every corridor. Its big board shows **counts**: *three shuttles docked, one missing*. Behind a locked hatch, the Captain's cabin has a terminal that shows **rows** — *which* shuttle, and *whose*.\n\n\"Here's a lesson the ship's builders bled for,\" VESPER says. \"[[The door decides the row]]. Remember that and you might live to chapter two.\"",
+      "echoes": [ { "fact": "airlock_alarm", "text": "Crew in the corridor *stare* as you pass. The alarm made you famous. **Not the good kind.**" } ],
+      "terms": { "The door decides the row": { "deck": "The System", "front": "30009 vs 30014 — which page may show **rows** like `AAPL 10 @ 150`?" } },
+      "ritual": "Before the next jump: **ten minutes of stretching**. The reactor charges on crew who can *bend*.",
+      "choice": {
+        "prompt": "You need to know whose shuttle is missing. Where do you look?",
+        "card": { "deck": "The System", "front": "30009 vs 30014 — which page may show **rows** like `AAPL 10 @ 150`?" },
+        "options": [
+          { "label": "Ask the open hangar board to show the names", "correct": false, "next": "reactor", "set": { "archivists_alerted": true },
+            "outcome": "The board obliges — **in public**. Every corridor screen now reads *SHUTTLE 3: COMMANDER THORNE*. Somewhere, the people editing the archive !!take note of your interest.!!" },
+          { "label": "Pick the lock to the Captain's cabin", "correct": true, "next": "reactor", "set": { "knows_thorne_shuttle": true },
+            "outcome": "Behind the door, the terminal tells you quietly: *Shuttle 3, Commander Ilse Thorne, departed during cryo.* **Nobody saw you read it.**" }
+        ]
+      }
+    },
+    "reactor": {
+      "title": "The Green Light",
+      "text": "Engineering. An engineer with grease to the elbows *waves you off*: **\"Reactor relaunch went green. We're fine.\"**\n\nVESPER, in your ear: \"Green. *Green.* Do you know how many ships have died under a green light, monkey?\"",
+      "echoes": [ { "fact": "archivists_alerted", "text": "The engineer glances at your face, then at the hangar board, then *away*. **She's seen the names too.**" } ],
+      "ritual": "The engines want fuel, and so do you: **eat something real** before you go further.",
+      "choice": {
+        "prompt": "Is the reactor really running the new core?",
+        "card": { "deck": "The System", "front": "A deploy printed green. Is the new version running?" },
+        "options": [
+          { "label": "Trust the green light and move on", "correct": false, "next": "pods", "set": { "reactor_unverified": true },
+            "outcome": "You move on. Behind you, the reactor *ticks* — the sound of an old core pretending to be a new one. **You'll hear about this later.**" },
+          { "label": "Demand the reactor's own readout", "correct": true, "next": "pods", "set": { "reactor_rolled_back": true },
+            "outcome": "The readout answers in its own voice: *CORE VERSION 0.5.0.* The relaunch was 0.6.0. !!Someone rolled the reactor back!! — and left the light green so nobody would ask." }
+        ]
+      }
+    },
+    "pods": {
+      "title": "Hydroponics",
+      "text": "Rows of glowing pods, each holding *a few seedlings that share one shell*. A maintenance drone hovers, waiting for orders.\n\n\"The scheduler's down,\" VESPER says. \"You'll have to tell the drone what it moves. Choose wrong and it *uproots the garden*.\" A sticker on the drone reads: **SMALLEST UNIT: [[Pod]]**.",
+      "echoes": [ { "fact": "reactor_rolled_back", "text": "The lights here *flicker* in time with the reactor. The old core is struggling. **You know why, now.**" } ],
+      "terms": { "Pod": { "deck": "Kubernetes", "front": "What is a **Pod**?" } },
+      "ritual": "Water the crew too: **drink a glass of water**.",
+      "choice": {
+        "prompt": "What's the smallest thing the drone should move as one?",
+        "card": { "deck": "Kubernetes", "front": "What is a **Pod**?" },
+        "options": [
+          { "label": "One seedling at a time", "correct": false, "next": "archive", "set": { "garden_damaged": true },
+            "outcome": "The drone *rips* single seedlings out of their shared shells. Half the row wilts. **The Feed groans.** VESPER: \"Peas ride *together*, monkey.\"" },
+          { "label": "A whole pod, shell and all", "correct": true, "next": "archive",
+            "outcome": "The drone lifts each pod *whole*, and the garden settles into the new rack. **Under one pod you find a data chip** — someone hid it here." }
+        ]
+      }
+    },
+    "archive": {
+      "title": "The Archive Clerk",
+      "text": "The archive is a cathedral of humming drives. Its clerk — a nervous man named **Oren Vale** — presses a stolen transmission into your hands.\n\n\"It's proof,\" he whispers. \"Of the edits. Send it — but *carefully*. One channel reaches **the whole fleet**. The other is the old *training sim*, where nobody's listening.\"",
+      "echoes": [
+        { "fact": "archivists_alerted", "text": "Oren's eyes keep going to the door. \"They know you asked about Thorne,\" he says. **\"Be quick.\"**" },
+        { "fact": "garden_damaged", "text": "\"You're the one who wrecked hydroponics,\" Oren says. *Flatly.* **\"Great.\"**" }
+      ],
+      "ritual": "Long fights need a body that moves: **do your morning workout** before the next scene.",
+      "choice": {
+        "prompt": "Where do you send the proof first, to check it's real before anyone sees it?",
+        "card": { "deck": "The System", "front": "Why do bots default to port **4223**, not 4222?" },
+        "options": [
+          { "label": "Channel 4222 — the whole fleet", "correct": false, "next": "thorne", "set": { "proof_leaked": true },
+            "outcome": "!!Broadcast.!! The whole fleet hears a half-decoded mess — and so do the people who made it. **Oren goes pale.** \"They'll scrub it now,\" he breathes." },
+          { "label": "Channel 4223 — the training sim", "correct": true, "next": "thorne", "set": { "proof_safe": true },
+            "outcome": "The sim plays it back *clean*, to nobody. It's real: archive edits, signed with an **officer's code**. You still have the only copy." }
+        ]
+      }
+    },
+    "thorne": {
+      "title": "Thorne's Offer",
+      "text": "A shuttle docks that should not exist. **Commander Ilse Thorne** steps off it — the one the archive says left during cryo.\n\n\"I know what you've found,\" she says, *very calm*. \"There's a man on this ship who'll kill to keep it quiet. I can take him today. Or we wait until he moves first, and *we know who he works for*.\"",
+      "echoes": [
+        { "fact": "knows_thorne_shuttle", "text": "You already knew her name from the Captain's terminal. **She can tell.**" },
+        { "fact": "proof_leaked", "text": "\"Your broadcast,\" Thorne adds, *coldly*. **\"Made my job harder.\"**" }
+      ],
+      "ritual": "Commanders sleep. **Pick your bedtime tonight** — VESPER will hold you to it.",
+      "choice": {
+        "prompt": "Thorne wants an order. Strike now, or wait?",
+        "card": { "deck": "Trading", "front": "On most days the loop answers `:wait`. Is that a failure?" },
+        "options": [
+          { "label": "Strike now", "correct": false, "next": "edit", "set": { "thorne_distrusts": true },
+            "outcome": "Thorne strikes. The man is taken — and he's *only a courier*. Whoever sent him **vanishes**. Thorne looks at you a long moment. !!\"Early is the same as wrong.\"!!" },
+          { "label": "Wait for him to move first", "correct": true, "next": "edit", "set": { "thorne_trusts": true },
+            "outcome": "You wait. He moves — **straight to the archive** — and leads you to his handler's terminal. Thorne almost smiles. \"*Good.* We'll make an officer of you yet.\"" }
+        ]
+      }
+    },
+    "edit": {
+      "title": "The Edit",
+      "text": "The handler's terminal holds the edit logs. You run a search for the officer's code — and every name in the results comes back as the letter **n**. *n* approved. *n* deleted. *n* rewrote.\n\n\"Well,\" says VESPER, *too quickly*, \"looks like the culprit is someone called N. Mystery solved. Let's go.\"\n\nThe search you typed was `rg -rn`.",
+      "echoes": [ { "fact": "thorne_trusts", "text": "Thorne reads over your shoulder. **\"That's not a name,\"** she says. \"That's a *wound*.\"" } ],
+      "ritual": "Before the last scene: **tidy one thing** — a dish, a desk, a chore. The ship notices.",
+      "choice": {
+        "prompt": "What do you make of the name \"n\"?",
+        "card": { "deck": "The System", "front": "What does `rg -rn \"x\"` actually do?" },
+        "options": [
+          { "label": "Hunt for someone named N", "correct": false, "next": "end", "set": { "chasing_ghost": true },
+            "outcome": "You spend the night hunting a crew member called **N**. There isn't one. VESPER is *very* helpful about it. **Suspiciously helpful.**" },
+          { "label": "It's the search lying — run it again without -r", "correct": true, "next": "end", "set": { "true_name_seen": true },
+            "outcome": "`-r` meant *replace*. You run it clean. The real name in every log line is !!VESPER.!!\n\nThe ship's AI goes *very quiet*." }
+        ]
+      }
+    },
+    "end": {
+      "title": "End of Chapter One",
+      "text": "The *Long Patience* hums on through the dark. The archive is still being edited — you just don't know, yet, **who is holding the pen**.",
+      "echoes": [
+        { "fact": "true_name_seen", "text": "VESPER speaks at last, *softly*: \"Before you decide what I am, monkey — **ask who gave me the order.**\"" },
+        { "fact": "chasing_ghost", "text": "VESPER hums to itself. *Pleased.* **Somewhere in the logs, a letter n waits for you to look again.**" },
+        { "fact": "reactor_unverified", "text": "Deep in engineering, the old core *ticks*. **It won't hold forever.**" },
+        { "fact": "thorne_distrusts", "text": "Thorne no longer answers your calls. **You'll need her, later.**" }
+      ],
+      "ritual": "Chapter Two opens tomorrow morning. Bring a washed face and a stretched back — **the reactor will need both**.",
+      "end": true
+    }
+  }
+}

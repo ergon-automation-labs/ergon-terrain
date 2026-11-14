@@ -28,6 +28,16 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     },
     %{subject: "terrain.cards.due", type: :request_reply, description: "List due cards"},
     %{
+      subject: "terrain.story.today",
+      type: :request_reply,
+      description: "This morning's story scene, recall gate, or outcome"
+    },
+    %{
+      subject: "terrain.story.choose",
+      type: :request_reply,
+      description: "Make the scene's choice (option) or answer the recall gate (gate)"
+    },
+    %{
       subject: "terrain.tip.today",
       type: :request_reply,
       description: "One card from one deck for this morning, with the words to tell it in"
@@ -198,6 +208,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.track.import",
       "terrain.cards.due",
       "terrain.tip.today",
+      "terrain.story.today",
+      "terrain.story.choose",
       "terrain.cards.list",
       "terrain.cards.create",
       "terrain.cards.update",
@@ -420,6 +432,35 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     else
       {:error, field} ->
         BotArmyLibraryRuntime.NATS.Reply.error("#{field} is not a valid date", :invalid_date)
+    end
+  end
+
+  # The morning story (`BotArmyTerrain.Story`). Progress lives in `story_store`; every choice is
+  # a card, and its grade goes through the same review path a deck press does.
+  defp handle_request("terrain.story.today", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, date} <- tip_date(msg["date"], DateTime.utc_now()) do
+      progress = story_store().get(tenant_id) || BotArmyTerrain.Story.start()
+      BotArmyLibraryRuntime.NATS.Reply.ok(story_reply(tenant_id, progress, date))
+    else
+      {:error, field} ->
+        BotArmyLibraryRuntime.NATS.Reply.error("#{field} is not a valid date", :invalid_date)
+    end
+  end
+
+  defp handle_request("terrain.story.choose", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, date} <- tip_date(msg["date"], DateTime.utc_now()),
+         progress = story_store().get(tenant_id) || BotArmyTerrain.Story.start(),
+         {:ok, progress, grade} <- story_step(tenant_id, progress, msg, date),
+         {:ok, progress} <- story_store().put(tenant_id, progress) do
+      grade_story_card(tenant_id, grade)
+      BotArmyLibraryRuntime.NATS.Reply.ok(story_reply(tenant_id, progress, date))
+    else
+      {:error, reason} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(story_error(reason), :story_refused)
     end
   end
 
@@ -891,6 +932,84 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp tip_since(_value, _date), do: {:error, "since"}
+
+  defp story_store,
+    do: Application.get_env(:bot_army_terrain, :story_store, BotArmyTerrain.StoryStore)
+
+  defp story_step(_tenant_id, progress, %{"gate" => index}, date),
+    do: BotArmyTerrain.Story.answer_gate(progress, index, date)
+
+  defp story_step(tenant_id, progress, %{"scene_id" => scene_id, "option" => index}, date)
+       when is_integer(index) do
+    BotArmyTerrain.Story.choose(progress, scene_id, index, date, &deck_cards(tenant_id, &1))
+  end
+
+  defp story_step(_tenant_id, _progress, _msg, _date), do: {:error, :no_such_option}
+
+  defp story_reply(tenant_id, progress, date) do
+    {mode, body} = BotArmyTerrain.Story.today(progress, date)
+
+    body =
+      case body do
+        %{"terms" => terms} when is_map(terms) ->
+          Map.put(body, "terms", resolve_terms(tenant_id, terms))
+
+        other ->
+          other
+      end
+
+    %{
+      "date" => Date.to_iso8601(date),
+      "chapter" => BotArmyTerrain.Story.chapter()["title"],
+      "scene_id" => progress.scene_id,
+      "mode" => Atom.to_string(mode),
+      "body" => body
+    }
+  end
+
+  # A term's card, so a hover can show what the word means. A term whose card is missing is
+  # dropped rather than drawn as a link to nothing.
+  defp resolve_terms(tenant_id, terms) do
+    for {word, %{"deck" => deck, "front" => front}} <- terms,
+        card = Enum.find(deck_cards(tenant_id, deck), &(&1.front == front)),
+        into: %{},
+        do: {word, %{"deck" => deck, "back" => card.back, "hook" => Map.get(card, :hook)}}
+  end
+
+  defp deck_cards(tenant_id, deck) do
+    case track_store().get_by_name(deck) do
+      nil -> []
+      track -> card_store().list_cards_for_track(tenant_id, track.id)
+    end
+  end
+
+  defp grade_story_card(tenant_id, {%{"deck" => deck, "front" => front}, quality}) do
+    case Enum.find(deck_cards(tenant_id, deck), &(&1.front == front)) do
+      nil ->
+        Logger.warning("Story graded a card that is not on #{deck}: #{front}")
+
+      card ->
+        case story_reviewer().(%{"card_id" => card.id, "quality" => quality, "tenant_id" => tenant_id}) do
+          :ok -> :ok
+          other -> Logger.warning("Story grade not recorded: #{inspect(other)}")
+        end
+    end
+  end
+
+  defp story_reviewer,
+    do:
+      Application.get_env(
+        :bot_army_terrain,
+        :story_reviewer,
+        &BotArmyTerrain.Handlers.ReviewHandler.handle_submit/1
+      )
+
+  defp story_error(:already_chosen), do: "this morning's choice is already made — the story goes on tomorrow"
+  defp story_error(:stale_scene), do: "that scene has already been played"
+  defp story_error(:no_such_option), do: "that choice is not on this scene"
+  defp story_error(:no_gate), do: "there is no question waiting to be answered"
+  defp story_error(%Ecto.Changeset{}), do: "the story could not be saved"
+  defp story_error(other), do: "the story refused (#{inspect(other)})"
 
   defp card_store,
     do: Application.get_env(:bot_army_terrain, :card_store, BotArmyTerrain.CardStore)
