@@ -24,6 +24,8 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
 
     Application.put_env(:bot_army_terrain, :story_dir, dir)
 
+    stub(BotArmyTerrain.AdEventStoreMock, :recent, fn _tenant, _kind, _limit -> [] end)
+
     on_exit(fn ->
       File.rm_rf(dir)
       Application.delete_env(:bot_army_terrain, :story_dir)

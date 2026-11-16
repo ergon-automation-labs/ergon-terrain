@@ -82,4 +82,32 @@ defmodule BotArmyTerrain.AdsTest do
     assert Enum.any?(Ads.creatives(), &(&1["id"] == "ch3-sponsor-ch1"))
     assert Ads.for_chapter(%{chapter: "ch2"}, ~D[2026-11-15]) == nil
   end
+
+  test "two skipped interstitials in a row silence the catalogue for seven days" do
+    latest = %{"occurred_on" => ~D[2026-11-16]}
+    previous = %{"occurred_on" => ~D[2026-11-15]}
+
+    assert Ads.silenced?([latest, previous], ~D[2026-11-16])
+    assert Ads.silenced?([latest, previous], ~D[2026-11-22])
+    refute Ads.silenced?([latest, previous], ~D[2026-11-23])
+
+    # The store hands back atom-keyed rows; the pure rule reads both shapes.
+    assert Ads.silenced?([%{occurred_on: ~D[2026-11-16]}, previous], ~D[2026-11-16])
+  end
+
+  test "one skip is not a silence" do
+    refute Ads.silenced?([%{"occurred_on" => ~D[2026-11-16]}], ~D[2026-11-16])
+    refute Ads.silenced?([], ~D[2026-11-16])
+  end
+
+  test "a silenced catalogue serves neither the chapter trailer nor the recap" do
+    progress = %{chapter: "ch1", scene_id: "edit"}
+    recap = %{chapter: "ch2", scene_id: "door"}
+
+    assert Ads.for_chapter(progress, ~D[2026-11-16])["kind"] == "trailer"
+    assert Ads.for_scene(recap, ~D[2026-11-16])["kind"] == "recap"
+
+    assert is_nil(Ads.for_chapter(progress, ~D[2026-11-16], silent: true))
+    assert is_nil(Ads.for_scene(recap, ~D[2026-11-16], silent: true))
+  end
 end

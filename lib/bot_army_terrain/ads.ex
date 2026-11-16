@@ -22,6 +22,7 @@ defmodule BotArmyTerrain.Ads do
   @slot "story_boundary"
   @chapter_start_slot "chapter_start"
   @sponsor_min_age 2
+  @silence_days 7
 
   @doc "Whether interstitials are allowed at all. `false` is absolute."
   def enabled? do
@@ -34,8 +35,8 @@ defmodule BotArmyTerrain.Ads do
   The read is local: a handful of JSON files, the already-cached chapter list, and string
   checks. No model, no render, no network.
   """
-  def for_chapter(progress, _date) do
-    if enabled?() do
+  def for_chapter(progress, _date, opts \\ []) do
+    if enabled?() and not silent?(opts) do
       chapter_id = progress.chapter
 
       chapter_id
@@ -55,9 +56,11 @@ defmodule BotArmyTerrain.Ads do
   it must not leak an answer from the chapter she is entering. It airs only on the chapter's
   first scene, so a reload mid-chapter cannot bring it back.
   """
-  def for_scene(progress, _date) do
-    if enabled?(), do: chapter_recap(progress)
+  def for_scene(progress, _date, opts \\ []) do
+    if enabled?() and not silent?(opts), do: chapter_recap(progress)
   end
+
+  defp silent?(opts), do: Keyword.get(opts, :silent, false)
 
   defp chapter_recap(progress) do
     chapter = Story.chapter(progress.chapter)
@@ -67,6 +70,25 @@ defmodule BotArmyTerrain.Ads do
       recap_for(progress.chapter, previous, chapter)
     end
   end
+
+  @doc """
+  Whether two skipped interstitials in a row put the story's ads to sleep for a week.
+
+  The silence is measured from the second skip: a skip is a "not this" and two in a row is a
+  clear enough answer that continuing to ask would be nagging. After seven days the catalogue
+  is offered again. The list is newest first.
+  """
+  def silenced?([latest | [_previous | _]], %Date{} = date) do
+    case Map.get(latest, :occurred_on) || Map.get(latest, "occurred_on") do
+      %Date{} = skipped -> Date.diff(date, skipped) < @silence_days
+      _ -> false
+    end
+  end
+
+  def silenced?(_events, _date), do: false
+
+  @doc "The event kinds a story interstitial may record."
+  def event_kinds, do: ~w(impression skip answer start)
 
   @doc "Every readable creative, in declaration order. Used by the renderer and tests."
   def creatives do

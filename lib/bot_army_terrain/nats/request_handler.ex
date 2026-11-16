@@ -43,6 +43,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       description: "Turn the page after a passed scene, without waiting for tomorrow"
     },
     %{
+      subject: "terrain.ad.event",
+      type: :request_reply,
+      description: "Record an interstitial impression, skip, answer, or start"
+    },
+    %{
       subject: "terrain.pitch.today",
       type: :request_reply,
       description: "One purpose spot (or one why question) for a project the panel holds"
@@ -496,6 +501,32 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       {:error, reason} ->
         BotArmyLibraryRuntime.NATS.Reply.error(story_error(reason), :story_refused)
     end
+  end
+
+  # The story's interstitials report back the two things the page knows: that the card was
+  # actually drawn, and that she skipped it. The write is idempotent at the boundary, so a
+  # refresh cannot inflate an impression, and a skip is recorded before the card is retired.
+  defp handle_request("terrain.ad.event", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, creative_id} <- required_string(msg["creative_id"], :missing_creative_id),
+         {:ok, kind} <- ad_kind(msg["kind"]),
+         {:ok, boundary_key} <- required_string(msg["boundary_key"], :missing_boundary_key),
+         {:ok, date} <- tip_date(msg["date"], DateTime.utc_now()),
+         {:ok, event} <-
+           ad_event_store().record(tenant_id, %{
+             creative_id: creative_id,
+             kind: kind,
+             boundary_key: boundary_key,
+             occurred_on: date
+           }) do
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{"event" => event})
+    else
+      {:error, reason} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(ad_event_error(reason), ad_event_code(reason))
+    end
+  rescue
+    _ -> BotArmyLibraryRuntime.NATS.Reply.error("the event could not be saved", :ad_event_refused)
   end
 
   # The purpose spots (`BotArmyTerrain.Pitch`). The panel already holds the projects, so the
@@ -1014,6 +1045,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp pitch_store,
     do: Application.get_env(:bot_army_terrain, :pitch_store, BotArmyTerrain.PitchStore)
 
+  defp ad_event_store,
+    do: Application.get_env(:bot_army_terrain, :ad_event_store, BotArmyTerrain.AdEventStore)
+
   defp pitch_attrs(%{"event" => "shown"} = msg, state, now) do
     {:ok,
      %{
@@ -1070,6 +1104,27 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp pitch_date(_msg, now), do: DateTime.to_date(now)
 
+  defp required_string(value, _reason) when is_binary(value) and value != "", do: {:ok, value}
+  defp required_string(_value, reason), do: {:error, reason}
+
+  defp ad_kind(kind) do
+    if kind in BotArmyTerrain.Ads.event_kinds(),
+      do: {:ok, kind},
+      else: {:error, :unknown_ad_event}
+  end
+
+  defp ad_event_error(:missing_creative_id), do: "creative_id required"
+  defp ad_event_error(:missing_boundary_key), do: "boundary_key required"
+  defp ad_event_error(:unknown_ad_event), do: "that is not an interstitial event"
+  defp ad_event_error(%Ecto.Changeset{}), do: "the event could not be saved"
+  defp ad_event_error(other), do: "the event refused (#{inspect(other)})"
+
+  defp ad_event_code(:missing_creative_id), do: :missing_creative_id
+  defp ad_event_code(:missing_boundary_key), do: :missing_boundary_key
+  defp ad_event_code(:unknown_ad_event), do: :unknown_ad_event
+  defp ad_event_code(%Ecto.Changeset{}), do: :ad_event_refused
+  defp ad_event_code(_other), do: :ad_event_refused
+
   defp pitch_error(:missing_project_id), do: "project_id required"
   defp pitch_error(:blank_why), do: "the why needs a sentence"
   defp pitch_error(:why_too_long), do: "keep the why to one sentence"
@@ -1116,7 +1171,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           other
       end
 
-    body = with_interstitial(mode, body, progress, date)
+    body = with_interstitial(mode, body, progress, date, tenant_id)
 
     %{
       "date" => Date.to_iso8601(date),
@@ -1134,21 +1189,32 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   # An interstitial belongs to a boundary: a chapter end or the first scene of a chapter she just
   # began, chosen from the local creative catalogue, and never for a page still being written.
-  defp with_interstitial(:scene, body, progress, date) do
-    case BotArmyTerrain.Ads.for_scene(progress, date) do
+  defp with_interstitial(:scene, body, progress, date, tenant_id) do
+    case BotArmyTerrain.Ads.for_scene(progress, date, silent: ad_silent?(tenant_id, date)) do
       nil -> body
       ad -> Map.put(body, "interstitial", ad)
     end
   end
 
-  defp with_interstitial(:end, body, progress, date) do
-    case BotArmyTerrain.Ads.for_chapter(progress, date) do
+  defp with_interstitial(:end, body, progress, date, tenant_id) do
+    case BotArmyTerrain.Ads.for_chapter(progress, date, silent: ad_silent?(tenant_id, date)) do
       nil -> body
       ad -> Map.put(body, "interstitial", ad)
     end
   end
 
-  defp with_interstitial(_mode, body, _progress, _date), do: body
+  defp with_interstitial(_mode, body, _progress, _date, _tenant_id), do: body
+
+  # Two skipped interstitials in a row are a clear "not this": the catalogue goes quiet for a
+  # week. The read is advisory, so a store that cannot answer must not take the story down with
+  # it — an unknown silence is no silence.
+  defp ad_silent?(tenant_id, date) do
+    tenant_id
+    |> ad_event_store().recent("skip", 2)
+    |> BotArmyTerrain.Ads.silenced?(date)
+  rescue
+    _ -> false
+  end
 
   # The page never waits on a model. When the chapter she is in has no next chapter yet, the
   # writer is asked at the first scene (prefetch); at the end, the page either turns itself or
