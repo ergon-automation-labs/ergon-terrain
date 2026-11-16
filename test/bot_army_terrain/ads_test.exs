@@ -32,10 +32,26 @@ defmodule BotArmyTerrain.AdsTest do
     assert Ads.for_chapter(%{chapter: "ch2"}, ~D[2026-11-15]) == nil
   end
 
+  test "a recap airs on the first scene of the next chapter and restates the last lesson" do
+    ad = Ads.for_scene(%{chapter: "ch2", scene_id: "door"}, ~D[2026-11-15])
+
+    assert ad["id"] == "ch1-recap-ch2"
+    assert ad["kind"] == "recap"
+    assert ad["boundary_key"] == "chapter_start:ch2"
+    assert ad["lesson"] == Story.chapter("ch1")["lesson"]
+    assert Ads.answer_free?(ad, Story.chapter("ch2"))
+  end
+
+  test "a recap does not air in the middle of a chapter or before the first one" do
+    assert Ads.for_scene(%{chapter: "ch2", scene_id: "pen"}, ~D[2026-11-15]) == nil
+    assert Ads.for_scene(%{chapter: "ch1", scene_id: "wake"}, ~D[2026-11-15]) == nil
+  end
+
   test "ads_enabled: false is absolute" do
     Application.put_env(:bot_army_terrain, :ads_enabled, false)
 
     assert Ads.for_chapter(%{chapter: "ch1"}, ~D[2026-11-15]) == nil
+    assert Ads.for_scene(%{chapter: "ch2", scene_id: "door"}, ~D[2026-11-15]) == nil
   end
 
   test "a trailer whose body contains an answer from the next chapter is refused" do

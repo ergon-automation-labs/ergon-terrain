@@ -1132,8 +1132,15 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     }
   end
 
-  # An interstitial belongs to the boundary, not to the scene: it is chosen only on the end page,
-  # from the local creative catalogue, and never for a page that is still being written.
+  # An interstitial belongs to a boundary: a chapter end or the first scene of a chapter she just
+  # began, chosen from the local creative catalogue, and never for a page still being written.
+  defp with_interstitial(:scene, body, progress, date) do
+    case BotArmyTerrain.Ads.for_scene(progress, date) do
+      nil -> body
+      ad -> Map.put(body, "interstitial", ad)
+    end
+  end
+
   defp with_interstitial(:end, body, progress, date) do
     case BotArmyTerrain.Ads.for_chapter(progress, date) do
       nil -> body

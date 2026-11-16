@@ -1,0 +1,15 @@
+{
+  "id": "ch1-recap-ch2",
+  "kind": "recap",
+  "slot": "chapter_start",
+  "air_after": "ch1",
+  "lesson": "A green light is a claim, not a fact.",
+  "order": 5,
+  "title": "Previously on The Quiet Archive",
+  "body": "You asked the reactor for its own readout, and the green light stopped being the truth. The light was a report. The readout was the fact.\n\nThe lesson: a green light is a claim, not a fact.",
+  "tagline": {
+    "prompt": "What claim are you treating as a fact right now?",
+    "max_chars": 140
+  },
+  "media": null
+}

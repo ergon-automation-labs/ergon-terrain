@@ -7,10 +7,11 @@ defmodule BotArmyTerrain.Ads do
   name a motion-comic enhancement, but the text is canonical and the page never depends on the
   video.
 
-  Interstitials are not an ad network. There is one slot (`story_boundary`), one creative per
-  boundary, no countdown, no urgency, and `ads_enabled: false` is absolute. A trailer for the
-  next chapter is refused if it would leak any of that chapter's answers; a sponsor is refused
-  until its lesson is at least two chapters old.
+  Interstitials are not an ad network. There are two slots — the end of a chapter
+  (`story_boundary`) and the first scene of the next (`chapter_start`, used for the recap) — one
+  creative per boundary, no countdown, no urgency, and `ads_enabled: false` is absolute. A
+  trailer for the next chapter is refused if it would leak any of that chapter's answers; a
+  sponsor is refused until its lesson is at least two chapters old.
   """
 
   require Logger
@@ -19,6 +20,7 @@ defmodule BotArmyTerrain.Ads do
 
   @creatives_dir Path.expand("../../priv/ads/creatives", __DIR__)
   @slot "story_boundary"
+  @chapter_start_slot "chapter_start"
   @sponsor_min_age 2
 
   @doc "Whether interstitials are allowed at all. `false` is absolute."
@@ -41,8 +43,28 @@ defmodule BotArmyTerrain.Ads do
       |> Enum.find(&allowed?(&1, chapter_id))
       |> case do
         nil -> nil
-        creative -> decorate(creative, chapter_id)
+        creative -> decorate(creative, chapter_id, "chapter_end:")
       end
+    end
+  end
+
+  @doc """
+  The one recap that may air when she opens `progress.chapter`, or nil.
+
+  A recap is story, not inventory: it restates the lesson of the chapter she just finished, and
+  it must not leak an answer from the chapter she is entering. It airs only on the chapter's
+  first scene, so a reload mid-chapter cannot bring it back.
+  """
+  def for_scene(progress, _date) do
+    if enabled?(), do: chapter_recap(progress)
+  end
+
+  defp chapter_recap(progress) do
+    chapter = Story.chapter(progress.chapter)
+    previous = previous_chapter(progress.chapter)
+
+    if chapter && previous && progress.scene_id == chapter["start"] do
+      recap_for(progress.chapter, previous, chapter)
     end
   end
 
@@ -64,12 +86,40 @@ defmodule BotArmyTerrain.Ads do
     |> Enum.all?(fn answer -> not String.contains?(text, String.downcase(answer)) end)
   end
 
+  defp recap_for(chapter_id, previous, chapter) do
+    creatives()
+    |> Enum.filter(fn creative ->
+      creative["slot"] == @chapter_start_slot and creative["air_after"] == previous["id"]
+    end)
+    |> Enum.sort_by(&{order(&1), &1["id"]})
+    |> Enum.find(&recap_allowed?(&1, previous, chapter))
+    |> case do
+      nil -> nil
+      creative -> decorate(creative, chapter_id, "chapter_start:")
+    end
+  end
+
   defp candidates(chapter_id) do
     creatives()
     |> Enum.filter(fn creative ->
       creative["slot"] == @slot and creative["air_after"] == chapter_id
     end)
     |> Enum.sort_by(&{order(&1), &1["id"]})
+  end
+
+  defp recap_allowed?(creative, previous, chapter) do
+    creative["kind"] == "recap" and
+      creative["lesson"] == previous["lesson"] and
+      answer_free?(creative, chapter)
+  end
+
+  defp previous_chapter(id) do
+    chapters = Story.chapters()
+
+    case Enum.find_index(chapters, &(&1["id"] == id)) do
+      index when is_integer(index) and index > 0 -> Enum.at(chapters, index - 1)
+      _ -> nil
+    end
   end
 
   defp allowed?(creative, chapter_id) do
@@ -144,11 +194,11 @@ defmodule BotArmyTerrain.Ads do
     |> Enum.join("\n")
   end
 
-  defp decorate(creative, chapter_id) do
+  defp decorate(creative, chapter_id, prefix) do
     %{
       "id" => creative["id"],
       "kind" => creative["kind"],
-      "boundary_key" => "chapter_end:" <> chapter_id,
+      "boundary_key" => prefix <> chapter_id,
       "title" => creative["title"],
       "body" => creative["body"],
       "tagline" => creative["tagline"],
