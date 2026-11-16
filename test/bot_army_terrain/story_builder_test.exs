@@ -28,6 +28,7 @@ defmodule BotArmyTerrain.StoryBuilderTest do
       "id" => "chx",
       "title" => "Chapter X",
       "start" => "one",
+      "lesson" => "The test is the lesson.",
       "deck" => "Test",
       "scenes" => [
         scene("one", "What is a door?"),
@@ -55,6 +56,7 @@ defmodule BotArmyTerrain.StoryBuilderTest do
   test "a plan becomes a chapter with the card's answer on the right button" do
     assert {:ok, chapter} = StoryBuilder.build(plan(), @cards)
     assert chapter["id"] == "chx"
+    assert chapter["lesson"] == "The test is the lesson."
     assert Map.keys(chapter["scenes"]) |> Enum.sort() == ["end", "four", "one", "three", "two"]
 
     one = chapter["scenes"]["one"]

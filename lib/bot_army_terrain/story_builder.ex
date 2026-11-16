@@ -27,6 +27,7 @@ defmodule BotArmyTerrain.StoryBuilder do
        %{
          "id" => plan["id"],
          "title" => plan["title"],
+         "lesson" => plan["lesson"],
          "start" => plan["start"],
          "scenes" => scenes
        }}
@@ -58,7 +59,9 @@ defmodule BotArmyTerrain.StoryBuilder do
 
   defp plan_missing(plan) do
     missing =
-      for key <- ~w(id title start), not present?(plan[key]), do: "the plan is missing #{key}"
+      for key <- ~w(id title start lesson),
+          not present?(plan[key]),
+          do: "the plan is missing #{key}"
 
     missing =
       if is_list(plan["scenes"]), do: missing, else: missing ++ ["the plan needs a scenes list"]

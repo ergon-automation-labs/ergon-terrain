@@ -113,7 +113,8 @@ defmodule BotArmyTerrain.Story do
       scene["end"] ->
         {:end,
          view(ch["id"], progress.scene_id, scene, progress.facts, date)
-         |> Map.put("next_chapter", next_chapter_stub(ch["id"]))}
+         |> Map.put("next_chapter", next_chapter_stub(ch["id"]))
+         |> Map.put("lesson", ch["lesson"])}
 
       true ->
         {:scene, view(ch["id"], progress.scene_id, scene, progress.facts, date)}

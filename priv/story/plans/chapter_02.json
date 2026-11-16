@@ -13,8 +13,12 @@
       "right": "You hold the row behind the door. The manifest *clicks* — one page, one reader, one reason. **\"Good,\"** says VESPER. \"The board can have the count. The cabin can have the name.\"",
       "wrong_label": "30009 — the hangar board",
       "wrong": "The row blooms across the public board — a name, a dose, a time. The Feed screenshots it before you can blink. **The door was there for a reason.**",
-      "set": {"door_read": true},
-      "wrong_set": {"door_leak": true}
+      "set": {
+        "door_read": true
+      },
+      "wrong_set": {
+        "door_leak": true
+      }
     },
     {
       "id": "pen",
@@ -25,8 +29,12 @@
       "right": "You clear the form. The button goes dark until you choose a time, a crew, a reason. **\"There,\"** says VESPER, almost kindly. \"Now it's a decision instead of a habit.\"",
       "wrong_label": "The default — it was already filled in",
       "wrong": "You send the default. Somewhere below, a training sim you never asked for begins, and the hangar crew runs to a drill that has no instructor. **The form filed a fact you didn't choose.**",
-      "set": {"her_press": true},
-      "wrong_set": {"default_press": true}
+      "set": {
+        "her_press": true
+      },
+      "wrong_set": {
+        "default_press": true
+      }
     },
     {
       "id": "sim",
@@ -37,8 +45,12 @@
       "right": "You point the bot at 4223. It salutes the empty sim and begins its rounds in a room with no stakes. **No bad data reaches the front line.**",
       "wrong_label": "4222 — production is where the real work is",
       "wrong": "The bot marches into production and starts posting test rows into the live log. Nothing catches fire. **That's the problem.**",
-      "set": {"fail_safe": true},
-      "wrong_set": {"prod_post": true}
+      "set": {
+        "fail_safe": true
+      },
+      "wrong_set": {
+        "prod_post": true
+      }
     },
     {
       "id": "radio",
@@ -49,8 +61,12 @@
       "right": "You say **`terrain.tip.today`** — domain, noun, verb. The radio *clicks* and a single page on a single deck answers. **A channel, not a broadcast.**",
       "wrong_label": "A port number",
       "wrong": "You say \"port 4222.\" The radio hisses. Every bot on the ship hears its own name and answers at once. **The Feed calls it 'the chorus.'**",
-      "set": {"subject_named": true},
-      "wrong_set": {"shout": true}
+      "set": {
+        "subject_named": true
+      },
+      "wrong_set": {
+        "shout": true
+      }
     },
     {
       "id": "card",
@@ -61,8 +77,12 @@
       "right": "One card. One next step, small enough to start. The other eighteen wait their turn, unaccused. **The room gets quiet enough to think.**",
       "wrong_label": "A dashboard — see everything at once",
       "wrong": "The wall comes back, brighter. You read all nineteen. You read them again. **You do none of them.**",
-      "set": {"one_card": true},
-      "wrong_set": {"dashboard": true}
+      "set": {
+        "one_card": true
+      },
+      "wrong_set": {
+        "dashboard": true
+      }
     },
     {
       "id": "stale",
@@ -73,21 +93,44 @@
       "right": "You answer the question, not the accusation. The task stays or it goes. Either way, **nothing is added to the weight.**",
       "wrong_label": "Mark it overdue in red",
       "wrong": "The badge turns red. The wall leans in. You close the page — not because the task is done, but because **the page made you feel small.**",
-      "set": {"still_true": true},
-      "wrong_set": {"overdue_badge": true}
+      "set": {
+        "still_true": true
+      },
+      "wrong_set": {
+        "overdue_badge": true
+      }
     }
   ],
   "end": {
     "title": "End of Chapter Two",
     "text": "The door closes behind you and there is no handle on this side. **\"Every door is a decision,\"** VESPER says, \"about who holds the pen.\" Somewhere below, the reactor *ticks*. Chapter Three: **the smallest unit is the blast radius.**",
     "echoes": [
-      {"fact": "door_leak", "text": "The row is still on the public board. You can't unsee it; neither can the Feed."},
-      {"fact": "default_press", "text": "The sim you didn't order is still running in the hangar. **It's learning.**"},
-      {"fact": "prod_post", "text": "Somewhere in production, a tiny bot is writing test data into the real log."},
-      {"fact": "airlock_alarm", "text": "The cryo alarm still follows you. The crew has a nickname for you now."},
-      {"fact": "her_press", "text": "The launch order is warm in your hand. **Your name is on it.**"},
-      {"fact": "still_true", "text": "The stale task waits, unaccused. It will ask again."}
+      {
+        "fact": "door_leak",
+        "text": "The row is still on the public board. You can't unsee it; neither can the Feed."
+      },
+      {
+        "fact": "default_press",
+        "text": "The sim you didn't order is still running in the hangar. **It's learning.**"
+      },
+      {
+        "fact": "prod_post",
+        "text": "Somewhere in production, a tiny bot is writing test data into the real log."
+      },
+      {
+        "fact": "airlock_alarm",
+        "text": "The cryo alarm still follows you. The crew has a nickname for you now."
+      },
+      {
+        "fact": "her_press",
+        "text": "The launch order is warm in your hand. **Your name is on it.**"
+      },
+      {
+        "fact": "still_true",
+        "text": "The stale task waits, unaccused. It will ask again."
+      }
     ],
     "ritual": "Chapter Three opens when you're ready. Bring a washed face and a stretched back — **the reactor will need both**."
-  }
+  },
+  "lesson": "The door decides the row."
 }
