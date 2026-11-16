@@ -14,10 +14,15 @@ defmodule BotArmyTerrain.Story do
   handler to send through the normal review path.
   """
 
-  @chapter_path Path.join([__DIR__, "..", "..", "priv", "story", "chapter_01.json"])
-  @external_resource @chapter_path
-  @chapter @chapter_path |> File.read!() |> Jason.decode!()
+  @chapter_dir Path.expand("../../priv/story", __DIR__)
+  @chapter_paths Path.wildcard(Path.join(@chapter_dir, "chapter_*.json"))
+  for path <- @chapter_paths, do: @external_resource(path)
 
+  @ordered_chapters Enum.map(@chapter_paths, &(&1 |> File.read!() |> Jason.decode!()))
+  @chapter Enum.find(@ordered_chapters, &(&1["id"] == "ch1")) || hd(@ordered_chapters)
+
+  # 4 is cold, unassisted retrieval. A choice on the page is cued by its options, so a right
+  # choice earns 3; the gate asks the card plainly and earns 4.
   @knew 4
   @missed 2
   @recovered 3
@@ -25,13 +30,37 @@ defmodule BotArmyTerrain.Story do
   @gate_size 3
   @redeem_after 2
 
+  @doc "The first chapter, where a new story starts."
   def chapter, do: @chapter
 
+  @doc "A chapter by its id, or nil when no such chapter exists."
+  def chapter(id) when is_binary(id), do: Enum.find(@ordered_chapters, &(&1["id"] == id))
+
+  @doc "The chapter after `id`, in reading order, or nil at the end of the season."
+  def next_chapter(id) when is_binary(id) do
+    ids = Enum.map(@ordered_chapters, & &1["id"])
+
+    case Enum.find_index(ids, &(&1 == id)) do
+      nil -> nil
+      i -> Enum.at(@ordered_chapters, i + 1)
+    end
+  end
+
+  def next_chapter(_id), do: nil
+
+  @doc "Every published chapter, in reading order."
+  def chapters, do: @ordered_chapters
+
   @doc "Progress for a story that has not started."
-  def start do
+  def start, do: start(@chapter["id"])
+
+  @doc "Progress at the first scene of a named chapter."
+  def start(chapter_id) when is_binary(chapter_id) do
+    ch = chapter(chapter_id) || @chapter
+
     %{
-      chapter: @chapter["id"],
-      scene_id: @chapter["start"],
+      chapter: ch["id"],
+      scene_id: ch["start"],
       facts: %{},
       log: [],
       chosen_on: nil,
@@ -40,6 +69,22 @@ defmodule BotArmyTerrain.Story do
   end
 
   def scene(id), do: Map.get(@chapter["scenes"], id)
+
+  @doc "A scene in a named chapter, or nil."
+  def scene(chapter_id, id) do
+    case chapter(chapter_id) do
+      nil -> nil
+      ch -> Map.get(ch["scenes"], id)
+    end
+  end
+
+  @doc "The page's choice options in a day's order, each carrying the index the bot understands."
+  def choice_options(choice, scene_id, %Date{} = date) do
+    for i <- shuffle(length(choice["options"]), scene_id, date) do
+      option = Enum.at(choice["options"], i)
+      %{"label" => option["label"], "index" => i}
+    end
+  end
 
   @doc """
   What the page draws now: `{:scene, scene}`, `{:gate, outcome}`, `{:redeem, page}`,
@@ -50,7 +95,8 @@ defmodule BotArmyTerrain.Story do
   end), at most one attempt a day.
   """
   def today(progress, %Date{} = date) do
-    scene = scene(progress.scene_id)
+    ch = chapter(progress.chapter) || @chapter
+    scene = scene(ch["id"], progress.scene_id)
     outcome = progress.last_outcome || %{}
     redeem = due_redemption(progress, date)
 
@@ -59,34 +105,70 @@ defmodule BotArmyTerrain.Story do
         {:gate, public(outcome)}
 
       redeem ->
-        {:redeem, redeem_view(redeem, date)}
+        {:redeem, redeem_view(ch["id"], redeem, date)}
 
       outcome["status"] == "passed" and not Map.has_key?(outcome, "redeem") ->
         {:done, public(outcome)}
 
       scene["end"] ->
-        {:end, view(scene, progress.facts)}
+        {:end,
+         view(ch["id"], progress.scene_id, scene, progress.facts, date)
+         |> Map.put("next_chapter", next_chapter_stub(ch["id"]))}
 
       true ->
-        {:scene, view(scene, progress.facts)}
+        {:scene, view(ch["id"], progress.scene_id, scene, progress.facts, date)}
     end
   end
 
   @doc """
-  Turn the page, without waiting for tomorrow. Only a passed scene has a next page; a gate
-  still open must be answered first, and a scene she has not finished has nowhere to go.
+  Turn the page after an outcome. The next scene is not gated by the clock. At the end of a
+  chapter, a second press opens the chapter that follows (facts travel; the path starts again).
   """
-  def next(%{last_outcome: %{"status" => "gate_open"}}, _date), do: {:error, :gate_open}
+  def next(progress, %Date{} = date) do
+    case {progress.last_outcome, scene(progress.chapter, progress.scene_id)} do
+      {%{"status" => "gate_open"}, _} ->
+        {:error, :gate_open}
 
-  def next(%{last_outcome: %{"status" => "passed"}} = progress, _date),
-    do: {:ok, %{progress | chosen_on: nil, last_outcome: nil}}
+      {%{"status" => "passed"}, _} ->
+        {:ok, %{progress | chosen_on: nil, last_outcome: nil}}
 
-  def next(_progress, _date), do: {:error, :not_done}
+      {nil, %{"end" => true}} ->
+        begin_next(progress, date)
+
+      _ ->
+        {:error, :not_done}
+    end
+  end
+
+  defp begin_next(progress, _date) do
+    case next_chapter(progress.chapter) do
+      nil ->
+        {:error, :no_next_chapter}
+
+      ch ->
+        {:ok,
+         %{
+           progress
+           | chapter: ch["id"],
+             scene_id: ch["start"],
+             log: [],
+             chosen_on: nil,
+             last_outcome: nil
+         }}
+    end
+  end
+
+  defp next_chapter_stub(id) do
+    case next_chapter(id) do
+      nil -> nil
+      ch -> %{"id" => ch["id"], "title" => ch["title"]}
+    end
+  end
 
   @doc """
   The scene with only the echoes its facts have earned, and choices without their answers.
   """
-  def view(scene, facts) do
+  def view(_chapter_id, scene_id, scene, facts, %Date{} = date) do
     echoes =
       for %{"fact" => fact, "text" => text} <- Map.get(scene, "echoes", []),
           Map.get(facts, fact),
@@ -100,7 +182,7 @@ defmodule BotArmyTerrain.Story do
         choice ->
           %{
             "prompt" => choice["prompt"],
-            "options" => Enum.map(choice["options"], &Map.take(&1, ["label"]))
+            "options" => choice_options(choice, scene_id, date)
           }
       end
 
@@ -115,8 +197,10 @@ defmodule BotArmyTerrain.Story do
   `{%{"deck", "front"}, quality}`, or `{:error, reason}`.
   """
   def choose(progress, scene_id, index, %Date{} = date, deck_cards) do
+    ch = chapter(progress.chapter) || @chapter
+
     with :ok <- may_choose(progress, scene_id, date),
-         %{"choice" => choice} <- scene(scene_id),
+         %{"choice" => choice} <- scene(ch["id"], scene_id),
          %{} = option <- Enum.at(choice["options"], index) do
       card = choice["card"]
       facts = Map.merge(progress.facts, Map.get(option, "set", %{}))
@@ -131,19 +215,39 @@ defmodule BotArmyTerrain.Story do
           ]
 
       if option["correct"] do
-        progress = %{
-          progress
-          | scene_id: option["next"],
-            facts: facts,
-            log: log,
-            chosen_on: date,
-            last_outcome: %{"status" => "passed", "text" => option["outcome"], "correct" => true}
-        }
-
-        {:ok, progress, {card, @knew}}
+        right_choice(progress, option, card, facts, log, date, deck_cards)
       else
-        gate = gate(card, deck_cards.(card["deck"]), date)
+        wrong_choice(progress, option, card, facts, log, date, deck_cards)
+      end
+    else
+      {:error, reason} -> {:error, reason}
+      _ -> {:error, :no_such_option}
+    end
+  end
 
+  defp right_choice(progress, option, card, facts, log, date, deck_cards) do
+    progress = %{
+      progress
+      | scene_id: option["next"],
+        facts: facts,
+        log: log,
+        chosen_on: date,
+        last_outcome: %{
+          "status" => "passed",
+          "text" => restate(option["outcome"], card, deck_cards.(card["deck"])),
+          "correct" => true
+        }
+    }
+
+    {:ok, progress, {card, @recovered}}
+  end
+
+  defp wrong_choice(progress, option, card, facts, log, date, deck_cards) do
+    case gate(card, deck_cards.(card["deck"]), date) do
+      nil ->
+        {:error, :missing_card}
+
+      gate ->
         progress = %{
           progress
           | facts: facts,
@@ -158,10 +262,6 @@ defmodule BotArmyTerrain.Story do
         }
 
         {:ok, progress, {card, @missed}}
-      end
-    else
-      {:error, reason} -> {:error, reason}
-      _ -> {:error, :no_such_option}
     end
   end
 
@@ -170,7 +270,7 @@ defmodule BotArmyTerrain.Story do
     outcome = progress.last_outcome || %{}
 
     with true <- outcome["status"] == "gate_open",
-         %{"choice" => choice} <- scene(progress.scene_id),
+         %{"choice" => choice} <- scene(progress.chapter, progress.scene_id),
          gate when is_map(gate) <- outcome["gate"],
          true <- is_integer(index) and index >= 0 and index < length(gate["options"]) do
       card = choice["card"]
@@ -190,7 +290,7 @@ defmodule BotArmyTerrain.Story do
                  "**Recalled.** The System grudgingly lets you through. *Next time, get it the first time.*\n\n" <>
                    right["outcome"]
              }
-         }, {card, @recovered}}
+         }, {card, @knew}}
       else
         {:ok,
          %{
@@ -218,7 +318,7 @@ defmodule BotArmyTerrain.Story do
   """
   def redeem(progress, scene_id, index, %Date{} = date) do
     with ^scene_id <- due_redemption(progress, date),
-         %{"choice" => choice} <- scene(scene_id),
+         %{"choice" => choice} <- scene(progress.chapter, scene_id),
          original when is_integer(original) <-
            Enum.at(shuffle(length(choice["options"]), scene_id, date), index) do
       option = Enum.at(choice["options"], original)
@@ -267,8 +367,10 @@ defmodule BotArmyTerrain.Story do
 
   @doc "The path so far: one line per choice, gate and redemption, oldest first."
   def path(progress) do
+    ch = chapter(progress.chapter) || @chapter
+
     for e <- progress.log do
-      scene = scene(e["scene"]) || %{}
+      scene = scene(ch["id"], e["scene"]) || %{}
 
       label =
         with i when is_integer(i) <- e["pick"],
@@ -296,7 +398,7 @@ defmodule BotArmyTerrain.Story do
     if Enum.any?(log, &(&1["kind"] == "redeem" and &1["on"] == today)) do
       nil
     else
-      at_end = (scene(progress.scene_id) || %{})["end"] == true
+      at_end = (scene(progress.chapter, progress.scene_id) || %{})["end"] == true
 
       log
       |> Enum.filter(&(&1["kind"] == "choice" and &1["correct"] == false))
@@ -326,8 +428,8 @@ defmodule BotArmyTerrain.Story do
     |> length()
   end
 
-  defp redeem_view(scene_id, date) do
-    scene = scene(scene_id)
+  defp redeem_view(chapter_id, scene_id, date) do
+    scene = scene(chapter_id, scene_id)
     options = scene["choice"]["options"]
 
     %{
@@ -370,26 +472,36 @@ defmodule BotArmyTerrain.Story do
   defp may_choose(_progress, _scene_id, _date), do: {:error, :stale_scene}
 
   defp gate(card, cards, date) do
-    right =
-      Enum.find_value(cards, "(the card is missing from its deck)", fn c ->
-        if c.front == card["front"], do: c.back
-      end)
+    case Enum.find(cards, &(&1.front == card["front"])) do
+      nil ->
+        nil
 
-    others = cards |> Enum.map(& &1.back) |> Enum.reject(&(&1 == right)) |> Enum.uniq()
-    seed = Date.to_gregorian_days(date)
+      %{back: right} ->
+        others = cards |> Enum.map(& &1.back) |> Enum.reject(&(&1 == right)) |> Enum.uniq()
+        seed = Date.to_gregorian_days(date)
 
-    distractors =
-      others
-      |> Enum.sort_by(&:erlang.phash2({&1, seed}))
-      |> Enum.take(@gate_size - 1)
+        distractors =
+          others
+          |> Enum.sort_by(&:erlang.phash2({&1, seed}))
+          |> Enum.take(@gate_size - 1)
 
-    options = Enum.sort_by([right | distractors], &:erlang.phash2({&1, seed + 1}))
+        options = Enum.sort_by([right | distractors], &:erlang.phash2({&1, seed + 1}))
 
-    %{
-      "question" => card["front"],
-      "options" => options,
-      "answer" => Enum.find_index(options, &(&1 == right))
-    }
+        %{
+          "question" => card["front"],
+          "options" => options,
+          "answer" => Enum.find_index(options, &(&1 == right))
+        }
+    end
+  end
+
+  # A right choice is cued by its options, so the fact is said again after the outcome: the
+  # learner sees the card's question and its answer together, once, and the story moves on.
+  defp restate(text, card, cards) do
+    case Enum.find(cards, &(&1.front == card["front"])) do
+      %{back: back} when is_binary(back) -> text <> "\n\n" <> card["front"] <> "\n" <> back
+      _ -> text
+    end
   end
 
   defp public(outcome) do

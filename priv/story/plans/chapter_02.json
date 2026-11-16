@@ -1,0 +1,93 @@
+{
+  "id": "ch2",
+  "title": "Chapter Two — The Door Decides the Row",
+  "start": "door",
+  "deck": "The System",
+  "scenes": [
+    {
+      "id": "door",
+      "title": "The Door",
+      "text": "The corridor past the cryo bay is lined with doors, and every door has a manifest beside it. VESPER steers you to one marked **MEDICAL — DECK 3**.\n\nA row of light hangs in the air: a name, a dose, a time. \"The Feed wants it,\" VESPER says. \"The hangar board would love it. The captain's page would *earn* it. Which page gets the row?\"",
+      "card": "30009 vs 30014 — which page may show **rows** like `AAPL 10 @ 150`?",
+      "prompt": "Which page gets the row?",
+      "right": "You hold the row behind the door. The manifest *clicks* — one page, one reader, one reason. **\"Good,\"** says VESPER. \"The board can have the count. The cabin can have the name.\"",
+      "wrong_label": "30009 — the hangar board",
+      "wrong": "The row blooms across the public board — a name, a dose, a time. The Feed screenshots it before you can blink. **The door was there for a reason.**",
+      "set": {"door_read": true},
+      "wrong_set": {"door_leak": true}
+    },
+    {
+      "id": "pen",
+      "title": "The Pen",
+      "text": "Inside, a launch order waits on a lectern. The form is already filled in: **TRAINING SIM, 06:00, CREW: ALL.** The cursor blinks beside a button that says *Send*.\n\n\"It opened on that,\" VESPER says. \"It always opens on that. The question is whether *you* opened it.\"",
+      "card": "A press would send a value. Where must the value come from?",
+      "prompt": "Where does the value come from?",
+      "right": "You clear the form. The button goes dark until you choose a time, a crew, a reason. **\"There,\"** says VESPER, almost kindly. \"Now it's a decision instead of a habit.\"",
+      "wrong_label": "The default — it was already filled in",
+      "wrong": "You send the default. Somewhere below, a training sim you never asked for begins, and the hangar crew runs to a drill that has no instructor. **The form filed a fact you didn't choose.**",
+      "set": {"her_press": true},
+      "wrong_set": {"default_press": true}
+    },
+    {
+      "id": "sim",
+      "title": "The Sim",
+      "text": "A maintenance bot wakes in the wall and asks for a port. Two numbers glow: **4222** and **4223**.\n\n\"One of them is the front line,\" VESPER says. \"One is the training sim. The bot doesn't know the difference. You do.\"",
+      "card": "Why do bots default to port **4223**, not 4222?",
+      "prompt": "Which port does the bot take?",
+      "right": "You point the bot at 4223. It salutes the empty sim and begins its rounds in a room with no stakes. **No bad data reaches the front line.**",
+      "wrong_label": "4222 — production is where the real work is",
+      "wrong": "The bot marches into production and starts posting test rows into the live log. Nothing catches fire. **That's the problem.**",
+      "set": {"fail_safe": true},
+      "wrong_set": {"prod_post": true}
+    },
+    {
+      "id": "radio",
+      "title": "The Radio",
+      "text": "The wall bot hands you a radio with no dial. \"Say a name,\" it says. \"Any name with dots.\"\n\nA subject is how the ship hears you. Say it wrong and the message goes nowhere — or worse, everywhere.",
+      "card": "What is a NATS **subject**?",
+      "prompt": "What is a subject?",
+      "right": "You say **`terrain.tip.today`** — domain, noun, verb. The radio *clicks* and a single page on a single deck answers. **A channel, not a broadcast.**",
+      "wrong_label": "A port number",
+      "wrong": "You say \"port 4222.\" The radio hisses. Every bot on the ship hears its own name and answers at once. **The Feed calls it 'the chorus.'**",
+      "set": {"subject_named": true},
+      "wrong_set": {"shout": true}
+    },
+    {
+      "id": "card",
+      "title": "The Card",
+      "text": "The next room is a wall of nineteen tasks. Each one glows. Each one is urgent. The wall hums like it *wants* you to read all of it.\n\nVESPER dims the wall to one card. \"The wall is not the work,\" it says. \"The wall is the *fear* of the work.\"",
+      "card": "Design lens rule #1: what beats a dashboard?",
+      "prompt": "What do you put on the wall?",
+      "right": "One card. One next step, small enough to start. The other eighteen wait their turn, unaccused. **The room gets quiet enough to think.**",
+      "wrong_label": "A dashboard — see everything at once",
+      "wrong": "The wall comes back, brighter. You read all nineteen. You read them again. **You do none of them.**",
+      "set": {"one_card": true},
+      "wrong_set": {"dashboard": true}
+    },
+    {
+      "id": "stale",
+      "title": "Still True?",
+      "text": "One card is older than the others. It has been on the wall for months. You brace for the red badge, the streak, the small voice that says *you failed*.\n\nInstead the card asks: **\"Still true?\"**",
+      "card": "How does the system talk about a task that's gone stale?",
+      "prompt": "How do you ask about it?",
+      "right": "You answer the question, not the accusation. The task stays or it goes. Either way, **nothing is added to the weight.**",
+      "wrong_label": "Mark it overdue in red",
+      "wrong": "The badge turns red. The wall leans in. You close the page — not because the task is done, but because **the page made you feel small.**",
+      "set": {"still_true": true},
+      "wrong_set": {"overdue_badge": true}
+    }
+  ],
+  "end": {
+    "title": "End of Chapter Two",
+    "text": "The door closes behind you and there is no handle on this side. **\"Every door is a decision,\"** VESPER says, \"about who holds the pen.\" Somewhere below, the reactor *ticks*. Chapter Three: **the smallest unit is the blast radius.**",
+    "echoes": [
+      {"fact": "door_leak", "text": "The row is still on the public board. You can't unsee it; neither can the Feed."},
+      {"fact": "default_press", "text": "The sim you didn't order is still running in the hangar. **It's learning.**"},
+      {"fact": "prod_post", "text": "Somewhere in production, a tiny bot is writing test data into the real log."},
+      {"fact": "airlock_alarm", "text": "The cryo alarm still follows you. The crew has a nickname for you now."},
+      {"fact": "her_press", "text": "The launch order is warm in your hand. **Your name is on it.**"},
+      {"fact": "still_true", "text": "The stale task waits, unaccused. It will ask again."}
+    ],
+    "ritual": "Chapter Three opens when you're ready. Bring a washed face and a stretched back — **the reactor will need both**."
+  }
+}

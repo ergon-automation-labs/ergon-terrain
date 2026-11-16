@@ -61,7 +61,7 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
                "option" => right
              })
 
-    assert_received {:graded, %{"card_id" => "c-nai", "quality" => 4}}
+    assert_received {:graded, %{"card_id" => "c-nai", "quality" => 3}}
   end
 
   test "a second choice after a passed scene saves and grades nothing" do
@@ -85,7 +85,23 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
     refute_received {:graded, _}
   end
 
+  test "the end of a chapter starts the next one" do
+    ended = %{Story.start() | scene_id: "end", facts: %{"airlock_alarm" => true}}
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> ended end)
+
+    expect(BotArmyTerrain.StoryStoreMock, :put, fn _tenant, progress ->
+      assert progress.chapter == "ch2"
+      assert progress.scene_id == "door"
+      {:ok, progress}
+    end)
+
+    assert {:noreply, _} = ask("terrain.story.next", %{"date" => "2026-11-14"})
+  end
+
   test "the next page clears the outcome and saves the scene that follows" do
+    greek_deck()
+
     progress = %{
       Story.start()
       | scene_id: "hangar",

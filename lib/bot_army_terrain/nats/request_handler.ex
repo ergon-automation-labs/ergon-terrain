@@ -1112,7 +1112,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
     %{
       "date" => Date.to_iso8601(date),
-      "chapter" => BotArmyTerrain.Story.chapter()["title"],
+      "chapter" =>
+        (BotArmyTerrain.Story.chapter(progress.chapter) || BotArmyTerrain.Story.chapter())[
+          "title"
+        ],
       "scene_id" => progress.scene_id,
       "mode" => Atom.to_string(mode),
       "body" => body,
@@ -1121,13 +1124,14 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     }
   end
 
-  # A term's card, so a hover can show what the word means. A term whose card is missing is
-  # dropped rather than drawn as a link to nothing.
+  # A term's card, asked as a question — never its answer. The hover is a cue, not a leak: the
+  # card's front is the prompt she is about to be tested on, and the hook is the memory handle.
+  # A term whose card is missing is dropped rather than drawn as a link to nothing.
   defp resolve_terms(tenant_id, terms) do
     for {word, %{"deck" => deck, "front" => front}} <- terms,
         card = Enum.find(deck_cards(tenant_id, deck), &(&1.front == front)),
         into: %{},
-        do: {word, %{"deck" => deck, "back" => card.back, "hook" => Map.get(card, :hook)}}
+        do: {word, %{"question" => card.front, "hook" => Map.get(card, :hook)}}
   end
 
   defp deck_cards(tenant_id, deck) do
@@ -1167,9 +1171,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp story_error(:gate_open), do: "the recall gate is still waiting for an answer"
   defp story_error(:not_done), do: "there is no next page until a choice is passed"
+  defp story_error(:no_next_chapter), do: "this is the last chapter for now"
 
   defp story_error(:stale_scene), do: "that scene has already been played"
   defp story_error(:no_such_option), do: "that choice is not on this scene"
+  defp story_error(:missing_card), do: "the card this scene tests is missing from its deck"
   defp story_error(:no_gate), do: "there is no question waiting to be answered"
   defp story_error(:no_redemption), do: "there is no second chance waiting this morning"
   defp story_error(%Ecto.Changeset{}), do: "the story could not be saved"

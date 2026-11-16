@@ -1,0 +1,237 @@
+{
+  "id": "ch2",
+  "scenes": {
+    "card": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "Design lens rule #1: what beats a dashboard?"
+        },
+        "options": [
+          {
+            "correct": true,
+            "label": "One card.",
+            "next": "stale",
+            "outcome": "One card. One next step, small enough to start. The other eighteen wait their turn, unaccused. **The room gets quiet enough to think.**",
+            "set": {
+              "one_card": true
+            }
+          },
+          {
+            "correct": false,
+            "label": "A dashboard — see everything at once",
+            "next": "stale",
+            "outcome": "The wall comes back, brighter. You read all nineteen. You read them again. **You do none of them.**",
+            "set": {
+              "dashboard": true
+            }
+          }
+        ],
+        "prompt": "What do you put on the wall?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "The next room is a wall of nineteen tasks. Each one glows. Each one is urgent. The wall hums like it *wants* you to read all of it.\n\nVESPER dims the wall to one card. \"The wall is not the work,\" it says. \"The wall is the *fear* of the work.\"",
+      "title": "The Card"
+    },
+    "door": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "30009 vs 30014 — which page may show **rows** like `AAPL 10 @ 150`?"
+        },
+        "options": [
+          {
+            "correct": true,
+            "label": "Only 30014.",
+            "next": "pen",
+            "outcome": "You hold the row behind the door. The manifest *clicks* — one page, one reader, one reason. **\"Good,\"** says VESPER. \"The board can have the count. The cabin can have the name.\"",
+            "set": {
+              "door_read": true
+            }
+          },
+          {
+            "correct": false,
+            "label": "30009 — the hangar board",
+            "next": "pen",
+            "outcome": "The row blooms across the public board — a name, a dose, a time. The Feed screenshots it before you can blink. **The door was there for a reason.**",
+            "set": {
+              "door_leak": true
+            }
+          }
+        ],
+        "prompt": "Which page gets the row?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "The corridor past the cryo bay is lined with doors, and every door has a manifest beside it. VESPER steers you to one marked **MEDICAL — DECK 3**.\n\nA row of light hangs in the air: a name, a dose, a time. \"The Feed wants it,\" VESPER says. \"The hangar board would love it. The captain's page would *earn* it. Which page gets the row?\"",
+      "title": "The Door"
+    },
+    "end": {
+      "echoes": [
+        {
+          "fact": "door_leak",
+          "text": "The row is still on the public board. You can't unsee it; neither can the Feed."
+        },
+        {
+          "fact": "default_press",
+          "text": "The sim you didn't order is still running in the hangar. **It's learning.**"
+        },
+        {
+          "fact": "prod_post",
+          "text": "Somewhere in production, a tiny bot is writing test data into the real log."
+        },
+        {
+          "fact": "airlock_alarm",
+          "text": "The cryo alarm still follows you. The crew has a nickname for you now."
+        },
+        {
+          "fact": "her_press",
+          "text": "The launch order is warm in your hand. **Your name is on it.**"
+        },
+        {
+          "fact": "still_true",
+          "text": "The stale task waits, unaccused. It will ask again."
+        }
+      ],
+      "end": true,
+      "ritual": "Chapter Three opens when you're ready. Bring a washed face and a stretched back — **the reactor will need both**.",
+      "text": "The door closes behind you and there is no handle on this side. **\"Every door is a decision,\"** VESPER says, \"about who holds the pen.\" Somewhere below, the reactor *ticks*. Chapter Three: **the smallest unit is the blast radius.**",
+      "title": "End of Chapter Two"
+    },
+    "pen": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "A press would send a value. Where must the value come from?"
+        },
+        "options": [
+          {
+            "correct": false,
+            "label": "The default — it was already filled in",
+            "next": "sim",
+            "outcome": "You send the default. Somewhere below, a training sim you never asked for begins, and the hangar crew runs to a drill that has no instructor. **The form filed a fact you didn't choose.**",
+            "set": {
+              "default_press": true
+            }
+          },
+          {
+            "correct": true,
+            "label": "From her press — never from a default the card opened on.",
+            "next": "sim",
+            "outcome": "You clear the form. The button goes dark until you choose a time, a crew, a reason. **\"There,\"** says VESPER, almost kindly. \"Now it's a decision instead of a habit.\"",
+            "set": {
+              "her_press": true
+            }
+          }
+        ],
+        "prompt": "Where does the value come from?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "Inside, a launch order waits on a lectern. The form is already filled in: **TRAINING SIM, 06:00, CREW: ALL.** The cursor blinks beside a button that says *Send*.\n\n\"It opened on that,\" VESPER says. \"It always opens on that. The question is whether *you* opened it.\"",
+      "title": "The Pen"
+    },
+    "radio": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "What is a NATS **subject**?"
+        },
+        "options": [
+          {
+            "correct": false,
+            "label": "A port number",
+            "next": "card",
+            "outcome": "You say \"port 4222.\" The radio hisses. Every bot on the ship hears its own name and answers at once. **The Feed calls it 'the chorus.'**",
+            "set": {
+              "shout": true
+            }
+          },
+          {
+            "correct": true,
+            "label": "A dotted name a message is sent to, like terrain.tip.today — domain, then noun, then verb.",
+            "next": "card",
+            "outcome": "You say **`terrain.tip.today`** — domain, noun, verb. The radio *clicks* and a single page on a single deck answers. **A channel, not a broadcast.**",
+            "set": {
+              "subject_named": true
+            }
+          }
+        ],
+        "prompt": "What is a subject?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "The wall bot hands you a radio with no dial. \"Say a name,\" it says. \"Any name with dots.\"\n\nA subject is how the ship hears you. Say it wrong and the message goes nowhere — or worse, everywhere.",
+      "title": "The Radio"
+    },
+    "sim": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "Why do bots default to port **4223**, not 4222?"
+        },
+        "options": [
+          {
+            "correct": true,
+            "label": "Fail-safe.",
+            "next": "radio",
+            "outcome": "You point the bot at 4223. It salutes the empty sim and begins its rounds in a room with no stakes. **No bad data reaches the front line.**",
+            "set": {
+              "fail_safe": true
+            }
+          },
+          {
+            "correct": false,
+            "label": "4222 — production is where the real work is",
+            "next": "radio",
+            "outcome": "The bot marches into production and starts posting test rows into the live log. Nothing catches fire. **That's the problem.**",
+            "set": {
+              "prod_post": true
+            }
+          }
+        ],
+        "prompt": "Which port does the bot take?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "A maintenance bot wakes in the wall and asks for a port. Two numbers glow: **4222** and **4223**.\n\n\"One of them is the front line,\" VESPER says. \"One is the training sim. The bot doesn't know the difference. You do.\"",
+      "title": "The Sim"
+    },
+    "stale": {
+      "choice": {
+        "card": {
+          "deck": "The System",
+          "front": "How does the system talk about a task that's gone stale?"
+        },
+        "options": [
+          {
+            "correct": false,
+            "label": "Mark it overdue in red",
+            "next": "end",
+            "outcome": "The badge turns red. The wall leans in. You close the page — not because the task is done, but because **the page made you feel small.**",
+            "set": {
+              "overdue_badge": true
+            }
+          },
+          {
+            "correct": true,
+            "label": "It asks \"still true?\" — never accuses.",
+            "next": "end",
+            "outcome": "You answer the question, not the accusation. The task stays or it goes. Either way, **nothing is added to the weight.**",
+            "set": {
+              "still_true": true
+            }
+          }
+        ],
+        "prompt": "How do you ask about it?"
+      },
+      "echoes": [],
+      "terms": {},
+      "text": "One card is older than the others. It has been on the wall for months. You brace for the red badge, the streak, the small voice that says *you failed*.\n\nInstead the card asks: **\"Still true?\"**",
+      "title": "Still True?"
+    }
+  },
+  "start": "door",
+  "title": "Chapter Two — The Door Decides the Row"
+}

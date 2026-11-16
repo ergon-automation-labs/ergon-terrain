@@ -23,11 +23,76 @@ defmodule BotArmyTerrain.StoryTest do
     do: Enum.find_index(Story.scene(scene_id)["choice"]["options"], &(!&1["correct"]))
 
   test "every scene's choice is a card, and every path leads somewhere real" do
-    for {id, scene} <- Story.chapter()["scenes"], scene["choice"] do
-      assert %{"deck" => _, "front" => _} = scene["choice"]["card"], id
+    for chapter <- Story.chapters(), {id, scene} <- chapter["scenes"], scene["choice"] do
+      assert %{"deck" => deck, "front" => _} = scene["choice"]["card"], id
+      assert is_binary(deck) and deck != "", "#{chapter["id"]}/#{id} has no deck"
       assert Enum.count(scene["choice"]["options"], & &1["correct"]) == 1, id
-      assert Enum.all?(scene["choice"]["options"], &Story.scene(&1["next"])), id
+      assert Enum.all?(scene["choice"]["options"], &Story.scene(chapter["id"], &1["next"])), id
     end
+  end
+
+  test "the season reads in order, and chapter two follows chapter one" do
+    assert Enum.map(Story.chapters(), & &1["id"]) == ["ch1", "ch2"]
+    assert Story.next_chapter("ch1")["id"] == "ch2"
+    assert Story.next_chapter("ch2") == nil
+  end
+
+  test "the end of a chapter offers the next one, and the facts travel" do
+    ended = %{Story.start() | scene_id: "end", facts: %{"airlock_alarm" => true}}
+
+    assert {:end, body} = Story.today(ended, @day)
+
+    assert body["next_chapter"] == %{
+             "id" => "ch2",
+             "title" => "Chapter Two — The Door Decides the Row"
+           }
+
+    assert {:ok, ch2} = Story.next(ended, @day)
+    assert ch2.chapter == "ch2"
+    assert ch2.scene_id == "door"
+    assert ch2.facts == %{"airlock_alarm" => true}
+    assert ch2.last_outcome == nil
+
+    assert {:scene, page} = Story.today(ch2, @day)
+    assert page["title"] == "The Door"
+    assert Enum.any?(page["choice"]["options"], &(&1["label"] == "Only 30014."))
+  end
+
+  test "chapter two plays: a right answer advances, a wrong one opens its gate" do
+    ch2 = Story.chapter("ch2")
+
+    cards =
+      for {_id, scene} <- ch2["scenes"], scene["choice"] do
+        right = Enum.find(scene["choice"]["options"], & &1["correct"])
+
+        %{
+          front: scene["choice"]["card"]["front"],
+          back: right["label"],
+          deck: scene["choice"]["card"]["deck"]
+        }
+      end
+
+    start = Story.start("ch2")
+    right = Enum.find_index(ch2["scenes"]["door"]["choice"]["options"], & &1["correct"])
+
+    assert {:ok, passed, {_, 3}} = Story.choose(start, "door", right, @day, fn _ -> cards end)
+    assert passed.scene_id == "pen"
+    assert passed.facts["door_read"] == true
+
+    wrong = Enum.find_index(ch2["scenes"]["door"]["choice"]["options"], &(!&1["correct"]))
+    assert {:ok, gated, {_, 2}} = Story.choose(start, "door", wrong, @day, fn _ -> cards end)
+    assert gated.last_outcome["status"] == "gate_open"
+    assert length(gated.last_outcome["gate"]["options"]) >= 2
+
+    answer = gated.last_outcome["gate"]["answer"]
+    assert {:ok, through, {_, 4}} = Story.answer_gate(gated, answer, @day)
+    assert through.scene_id == "pen"
+    assert through.facts["door_leak"] == true
+  end
+
+  test "the last chapter has no next chapter" do
+    ended = %{Story.start("ch2") | scene_id: "end"}
+    assert {:error, :no_next_chapter} = Story.next(ended, @day)
   end
 
   test "the page never sees which option is right" do
@@ -36,11 +101,29 @@ defmodule BotArmyTerrain.StoryTest do
     refute inspect(view["choice"]) =~ "outcome"
   end
 
-  test "a right choice moves on, grades 4, and waits on the outcome page" do
-    {:ok, p, {card, 4}} = Story.choose(Story.start(), "wake", right_index("wake"), @day, &greek/1)
+  test "the page's options are shuffled, and each carries the index the bot understands" do
+    {:scene, view} = Story.today(Story.start(), @day)
+    authored = Enum.map(Story.scene("wake")["choice"]["options"], & &1["label"])
+    shown = Enum.map(view["choice"]["options"], & &1["label"])
+
+    assert Enum.sort(shown) == Enum.sort(authored)
+    assert view["choice"]["options"] |> Enum.map(& &1["index"]) |> Enum.sort() == [0, 1]
+
+    right = Enum.find_index(Story.scene("wake")["choice"]["options"], & &1["correct"])
+    assert Enum.find(view["choice"]["options"], &(&1["index"] == right))["label"] == "Press Ναι"
+  end
+
+  test "a wrong choice whose card is missing does not invent a gate answer" do
+    assert {:error, :missing_card} =
+             Story.choose(Story.start(), "wake", wrong_index("wake"), @day, fn _ -> [] end)
+  end
+
+  test "a right choice moves on, grades 3, and waits on the outcome page" do
+    {:ok, p, {card, 3}} = Story.choose(Story.start(), "wake", right_index("wake"), @day, &greek/1)
 
     assert card["deck"] == "Greek"
     assert p.scene_id == "hangar"
+    assert p.last_outcome["text"] =~ "Pronounced"
     assert {:done, %{"correct" => true}} = Story.today(p, @day)
     assert {:error, :already_chosen} = Story.choose(p, "hangar", 0, @day, &greek/1)
 
@@ -83,7 +166,7 @@ defmodule BotArmyTerrain.StoryTest do
     answer = p.last_outcome["gate"]["answer"]
     miss = Enum.find(0..2, &(&1 != answer))
 
-    {:ok, passed, {_, 3}} = Story.answer_gate(p, answer, @day)
+    {:ok, passed, {_, 4}} = Story.answer_gate(p, answer, @day)
     assert passed.scene_id == "hangar"
     assert passed.last_outcome["text"] =~ "Recalled"
 
