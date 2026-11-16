@@ -222,37 +222,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   end
 
   defp subscribe(conn, state) do
-    subscriptions = [
-      "terrain.tracks.list",
-      "terrain.tracks.import",
-      "terrain.track.import",
-      "terrain.cards.due",
-      "terrain.tip.today",
-      "terrain.story.today",
-      "terrain.story.choose",
-      "terrain.story.next",
-      "terrain.pitch.today",
-      "terrain.pitch.record",
-      "terrain.cards.list",
-      "terrain.cards.create",
-      "terrain.cards.update",
-      "terrain.cards.delete",
-      "terrain.cards.restore",
-      "terrain.tracks.create",
-      "terrain.tracks.update",
-      "terrain.review.submit",
-      "terrain.session.start",
-      "terrain.session.end",
-      "terrain.session.stats",
-      "terrain.cards.similar",
-      "terrain.lesson.generation.request",
-      "terrain.lesson.get",
-      "terrain.lesson.list",
-      "terrain.game.generate",
-      "terrain.game.status",
-      "terrain.game.get",
-      "terrain.system.srs_signal"
-    ]
+    # The registry list above is the one source of truth: there used to be a second, hand-kept
+    # list here, and a new subject could be registered without ever being subscribed (which is
+    # exactly what happened to `terrain.ad.event` on 0.9.0).
+    subscriptions = Enum.map(@subjects, & &1.subject)
 
     # Same as the event handler: no `:nats, :connected` clause, so the
     # Connection must own the re-subscription. Registering the subjects against
