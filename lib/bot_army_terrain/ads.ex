@@ -9,8 +9,9 @@ defmodule BotArmyTerrain.Ads do
 
   Interstitials are not an ad network. There are two slots — the end of a chapter
   (`story_boundary`) and the first scene of the next (`chapter_start`, used for the recap) — one
-  creative per boundary, no countdown, no urgency, and `ads_enabled: false` is absolute. A
-  trailer for the next chapter is refused if it would leak any of that chapter's answers; a
+  creative per boundary, no countdown, no urgency, and `ads_enabled: false` is absolute for
+  commercials. A recap is story, not inventory, so it still opens the chapter when ads are off.
+  A trailer for the next chapter is refused if it would leak any of that chapter's answers; a
   sponsor is refused until its lesson is at least two chapters old.
   """
 
@@ -54,10 +55,11 @@ defmodule BotArmyTerrain.Ads do
 
   A recap is story, not inventory: it restates the lesson of the chapter she just finished, and
   it must not leak an answer from the chapter she is entering. It airs only on the chapter's
-  first scene, so a reload mid-chapter cannot bring it back.
+  first scene, so a reload mid-chapter cannot bring it back. It survives `ads_enabled: false`
+  and the skip-silence rule: turning off commercials is not the same as turning off the story.
   """
-  def for_scene(progress, _date, opts \\ []) do
-    if enabled?() and not silent?(opts), do: chapter_recap(progress)
+  def for_scene(progress, _date, _opts \\ []) do
+    chapter_recap(progress)
   end
 
   defp silent?(opts), do: Keyword.get(opts, :silent, false)

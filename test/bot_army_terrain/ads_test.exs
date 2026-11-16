@@ -47,11 +47,11 @@ defmodule BotArmyTerrain.AdsTest do
     assert Ads.for_scene(%{chapter: "ch1", scene_id: "wake"}, ~D[2026-11-15]) == nil
   end
 
-  test "ads_enabled: false is absolute" do
+  test "ads_enabled: false is absolute for ads, but a recap is not an ad" do
     Application.put_env(:bot_army_terrain, :ads_enabled, false)
 
     assert Ads.for_chapter(%{chapter: "ch1"}, ~D[2026-11-15]) == nil
-    assert Ads.for_scene(%{chapter: "ch2", scene_id: "door"}, ~D[2026-11-15]) == nil
+    assert Ads.for_scene(%{chapter: "ch2", scene_id: "door"}, ~D[2026-11-15])["kind"] == "recap"
   end
 
   test "a trailer whose body contains an answer from the next chapter is refused" do
@@ -100,14 +100,12 @@ defmodule BotArmyTerrain.AdsTest do
     refute Ads.silenced?([], ~D[2026-11-16])
   end
 
-  test "a silenced catalogue serves neither the chapter trailer nor the recap" do
+  test "a silenced catalogue serves no trailer, but the recap still opens the chapter" do
     progress = %{chapter: "ch1", scene_id: "edit"}
     recap = %{chapter: "ch2", scene_id: "door"}
 
     assert Ads.for_chapter(progress, ~D[2026-11-16])["kind"] == "trailer"
-    assert Ads.for_scene(recap, ~D[2026-11-16])["kind"] == "recap"
-
     assert is_nil(Ads.for_chapter(progress, ~D[2026-11-16], silent: true))
-    assert is_nil(Ads.for_scene(recap, ~D[2026-11-16], silent: true))
+    assert Ads.for_scene(recap, ~D[2026-11-16], silent: true)["kind"] == "recap"
   end
 end

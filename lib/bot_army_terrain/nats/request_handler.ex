@@ -1162,8 +1162,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   # An interstitial belongs to a boundary: a chapter end or the first scene of a chapter she just
   # began, chosen from the local creative catalogue, and never for a page still being written.
-  defp with_interstitial(:scene, body, progress, date, tenant_id) do
-    case BotArmyTerrain.Ads.for_scene(progress, date, silent: ad_silent?(tenant_id, date)) do
+  # A recap is story, not inventory, so neither `ads_enabled: false` nor a skipped commercial
+  # keeps it off the first scene. Only the end-of-chapter trailer obeys the silence rule.
+  defp with_interstitial(:scene, body, progress, date, _tenant_id) do
+    case BotArmyTerrain.Ads.for_scene(progress, date) do
       nil -> body
       ad -> Map.put(body, "interstitial", ad)
     end
