@@ -1116,6 +1116,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           other
       end
 
+    body = with_interstitial(mode, body, progress, date)
+
     %{
       "date" => Date.to_iso8601(date),
       "chapter" =>
@@ -1129,6 +1131,17 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "path" => BotArmyTerrain.Story.path(progress)
     }
   end
+
+  # An interstitial belongs to the boundary, not to the scene: it is chosen only on the end page,
+  # from the local creative catalogue, and never for a page that is still being written.
+  defp with_interstitial(:end, body, progress, date) do
+    case BotArmyTerrain.Ads.for_chapter(progress, date) do
+      nil -> body
+      ad -> Map.put(body, "interstitial", ad)
+    end
+  end
+
+  defp with_interstitial(_mode, body, _progress, _date), do: body
 
   # The page never waits on a model. When the chapter she is in has no next chapter yet, the
   # writer is asked at the first scene (prefetch); at the end, the page either turns itself or

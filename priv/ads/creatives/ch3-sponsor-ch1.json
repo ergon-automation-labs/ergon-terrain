@@ -1,0 +1,15 @@
+{
+  "id": "ch3-sponsor-ch1",
+  "kind": "sponsor",
+  "slot": "story_boundary",
+  "air_after": "ch3",
+  "lesson": "A green light is a claim, not a fact.",
+  "order": 20,
+  "sponsor": "The Quiet Archive",
+  "title": "A word from the Archive: the green light",
+  "body": "The green light never told you the door was safe. It told you the door was willing.\n\nThe difference is the whole job: a light is a claim, and a claim is something you can check.",
+  "tagline": {
+    "prompt": "What claim are you treating as a fact right now?",
+    "max_chars": 140
+  }
+}

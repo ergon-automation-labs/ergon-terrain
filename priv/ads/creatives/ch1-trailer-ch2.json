@@ -1,0 +1,18 @@
+{
+  "id": "ch1-trailer-ch2",
+  "kind": "trailer",
+  "slot": "story_boundary",
+  "air_after": "ch1",
+  "lesson": "The door decides the row.",
+  "order": 10,
+  "title": "Next: The Door Decides the Row",
+  "body": "A manifest is not a suggestion. The door reads the row you chose, then decides what you're allowed to see.\n\nIf you've ever pressed the button that was already highlighted because choosing felt like work, you already know why this matters.",
+  "tagline": {
+    "prompt": "Where does a default decide for you?",
+    "max_chars": 120
+  },
+  "media": {
+    "key": "ch1-trailer-ch2",
+    "poster": "ch1-trailer-ch2.jpg"
+  }
+}
