@@ -321,11 +321,31 @@ defmodule BotArmyTerrain.StoryWriter do
       {:ok, path} ->
         Logger.info("Terrain: published #{job.chapter_id} at #{path} (#{source})")
         emit_ready(job, chapter, source)
+        request_boundary_interstitials(job)
         finish(job, state)
 
       {:error, reason} ->
         fail(job, {:write_failed, reason}, state)
     end
+  end
+
+  # A chapter landing is also the earliest moment the two interstitials around it become
+  # knowable. Asking now gives the producer the whole time she spends in the previous chapter;
+  # the end-of-chapter request remains as a fallback if this one was lost.
+  defp request_boundary_interstitials(job) do
+    producer =
+      Application.get_env(:bot_army_terrain, :ads_producer, &BotArmyTerrain.AdsProducer.ensure/2)
+
+    producer.(job.tenant_id, job.previous_id)
+  rescue
+    error ->
+      Logger.warning(
+        "Terrain: ad producer unavailable after publish: #{Exception.message(error)}"
+      )
+
+      :error
+  catch
+    :exit, _ -> :error
   end
 
   defp emit_ready(job, chapter, source) do
