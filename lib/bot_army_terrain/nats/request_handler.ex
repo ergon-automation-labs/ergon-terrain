@@ -38,6 +38,16 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       description: "Make the scene's choice (option) or answer the recall gate (gate)"
     },
     %{
+      subject: "terrain.pitch.today",
+      type: :request_reply,
+      description: "One purpose spot (or one why question) for a project the panel holds"
+    },
+    %{
+      subject: "terrain.pitch.record",
+      type: :request_reply,
+      description: "Record a purpose spot's shown/start/snooze/retire/why event"
+    },
+    %{
       subject: "terrain.tip.today",
       type: :request_reply,
       description: "One card from one deck for this morning, with the words to tell it in"
@@ -210,6 +220,8 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.tip.today",
       "terrain.story.today",
       "terrain.story.choose",
+      "terrain.pitch.today",
+      "terrain.pitch.record",
       "terrain.cards.list",
       "terrain.cards.create",
       "terrain.cards.update",
@@ -404,7 +416,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
          {:ok, since} <- tip_since(msg["since"], date) do
       decks =
         track_store().list_tracks(status: "active")
-        |> Enum.map(fn track -> {track, card_store().list_cards_for_track(tenant_id, track.id)} end)
+        |> Enum.map(fn track ->
+          {track, card_store().list_cards_for_track(tenant_id, track.id)}
+        end)
 
       tip =
         case BotArmyTerrain.Tip.choose(decks, date, since, now) do
@@ -461,6 +475,44 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     else
       {:error, reason} ->
         BotArmyLibraryRuntime.NATS.Reply.error(story_error(reason), :story_refused)
+    end
+  end
+
+  # The purpose spots (`BotArmyTerrain.Pitch`). The panel already holds the projects, so the
+  # read takes them as given rather than making this bot reach the GTD bot on the hot path.
+  # A spot is chosen from the project's next action, never from how overdue it is.
+  defp handle_request("terrain.pitch.today", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    case msg["projects"] do
+      projects when is_list(projects) ->
+        states =
+          tenant_id
+          |> pitch_store().all()
+          |> Map.new(&{&1.project_id, &1})
+
+        BotArmyLibraryRuntime.NATS.Reply.ok(%{
+          "pitch" => BotArmyTerrain.Pitch.pick(projects, states, DateTime.utc_now())
+        })
+
+      _other ->
+        BotArmyLibraryRuntime.NATS.Reply.error("projects must be a list", :invalid_projects)
+    end
+  end
+
+  defp handle_request("terrain.pitch.record", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+    project_id = msg["project_id"]
+    now = DateTime.utc_now()
+
+    with true <- (is_binary(project_id) and project_id != "") || {:error, :missing_project_id},
+         state = pitch_store().get(tenant_id, project_id),
+         {:ok, attrs} <- pitch_attrs(msg, state, now),
+         {:ok, saved} <- pitch_store().put(tenant_id, project_id, attrs) do
+      BotArmyLibraryRuntime.NATS.Reply.ok(%{"pitch" => saved})
+    else
+      {:error, reason} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(pitch_error(reason), pitch_code(reason))
     end
   end
 
@@ -936,6 +988,67 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp story_store,
     do: Application.get_env(:bot_army_terrain, :story_store, BotArmyTerrain.StoryStore)
 
+  defp pitch_store,
+    do: Application.get_env(:bot_army_terrain, :pitch_store, BotArmyTerrain.PitchStore)
+
+  defp pitch_attrs(%{"event" => "shown"}, state, now) do
+    {:ok,
+     %{
+       last_shown_at: now,
+       last_shown_on: DateTime.to_date(now),
+       shown_count: count(state, :shown_count) + 1
+     }}
+  end
+
+  defp pitch_attrs(%{"event" => "start"}, state, now) do
+    {:ok,
+     %{
+       last_shown_at: now,
+       last_shown_on: DateTime.to_date(now),
+       last_started_at: now,
+       start_count: count(state, :start_count) + 1
+     }}
+  end
+
+  defp pitch_attrs(%{"event" => "snooze"}, _state, now),
+    do: {:ok, %{snoozed_until: BotArmyTerrain.Pitch.snooze_until(now)}}
+
+  defp pitch_attrs(%{"event" => "retire"}, _state, now),
+    do: {:ok, %{status: "retired", retired_at: now}}
+
+  defp pitch_attrs(%{"event" => "why", "why" => text}, _state, _now) do
+    case BotArmyTerrain.Pitch.clean_why(text) do
+      {:ok, why} ->
+        {:ok,
+         %{why: why, status: "ready", retired_at: nil, last_shown_at: nil, last_shown_on: nil}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp pitch_attrs(%{"event" => "retire_why"}, _state, now),
+    do: {:ok, %{status: "retired", retired_at: now}}
+
+  defp pitch_attrs(_msg, _state, _now), do: {:error, :unknown_event}
+
+  defp count(nil, _field), do: 0
+  defp count(state, field), do: Map.get(state, field) || 0
+
+  defp pitch_error(:missing_project_id), do: "project_id required"
+  defp pitch_error(:blank_why), do: "the why needs a sentence"
+  defp pitch_error(:why_too_long), do: "keep the why to one sentence"
+  defp pitch_error(:unknown_event), do: "that is not a pitch event"
+  defp pitch_error(%Ecto.Changeset{}), do: "the pitch could not be saved"
+  defp pitch_error(other), do: "the pitch refused (#{inspect(other)})"
+
+  defp pitch_code(:missing_project_id), do: :missing_project_id
+  defp pitch_code(:blank_why), do: :blank_why
+  defp pitch_code(:why_too_long), do: :why_too_long
+  defp pitch_code(:unknown_event), do: :unknown_event
+  defp pitch_code(%Ecto.Changeset{}), do: :pitch_refused
+  defp pitch_code(_other), do: :pitch_refused
+
   defp story_step(_tenant_id, progress, %{"redeem" => scene_id, "option" => index}, date)
        when is_integer(index),
        do: BotArmyTerrain.Story.redeem(progress, scene_id, index, date)
@@ -995,7 +1108,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         Logger.warning("Story graded a card that is not on #{deck}: #{front}")
 
       card ->
-        case story_reviewer().(%{"card_id" => card.id, "quality" => quality, "tenant_id" => tenant_id}) do
+        case story_reviewer().(%{
+               "card_id" => card.id,
+               "quality" => quality,
+               "tenant_id" => tenant_id
+             }) do
           :ok -> :ok
           other -> Logger.warning("Story grade not recorded: #{inspect(other)}")
         end
@@ -1010,7 +1127,9 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
         &BotArmyTerrain.Handlers.ReviewHandler.handle_submit/1
       )
 
-  defp story_error(:already_chosen), do: "this morning's choice is already made — the story goes on tomorrow"
+  defp story_error(:already_chosen),
+    do: "this morning's choice is already made — the story goes on tomorrow"
+
   defp story_error(:stale_scene), do: "that scene has already been played"
   defp story_error(:no_such_option), do: "that choice is not on this scene"
   defp story_error(:no_gate), do: "there is no question waiting to be answered"
