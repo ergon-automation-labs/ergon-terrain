@@ -11,7 +11,11 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
 
   setup do
     me = self()
-    Application.put_env(:bot_army_terrain, :story_reviewer, fn msg -> send(me, {:graded, msg}) && :ok end)
+
+    Application.put_env(:bot_army_terrain, :story_reviewer, fn msg ->
+      send(me, {:graded, msg}) && :ok
+    end)
+
     on_exit(fn -> Application.delete_env(:bot_army_terrain, :story_reviewer) end)
     :ok
   end
@@ -51,18 +55,53 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
     right = Enum.find_index(Story.scene("wake")["choice"]["options"], & &1["correct"])
 
     assert {:noreply, _} =
-             ask("terrain.story.choose", %{"date" => "2026-11-14", "scene_id" => "wake", "option" => right})
+             ask("terrain.story.choose", %{
+               "date" => "2026-11-14",
+               "scene_id" => "wake",
+               "option" => right
+             })
 
     assert_received {:graded, %{"card_id" => "c-nai", "quality" => 4}}
   end
 
-  test "a second choice the same morning saves and grades nothing" do
-    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> %{Story.start() | chosen_on: ~D[2026-11-14]} end)
+  test "a second choice after a passed scene saves and grades nothing" do
+    progress = %{
+      Story.start()
+      | scene_id: "hangar",
+        chosen_on: ~D[2026-11-14],
+        last_outcome: %{"status" => "passed"}
+    }
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> progress end)
     expect(BotArmyTerrain.StoryStoreMock, :put, 0, fn _, _ -> {:ok, %{}} end)
 
     assert {:noreply, _} =
-             ask("terrain.story.choose", %{"date" => "2026-11-14", "scene_id" => "wake", "option" => 0})
+             ask("terrain.story.choose", %{
+               "date" => "2026-11-14",
+               "scene_id" => "hangar",
+               "option" => 0
+             })
 
     refute_received {:graded, _}
+  end
+
+  test "the next page clears the outcome and saves the scene that follows" do
+    progress = %{
+      Story.start()
+      | scene_id: "hangar",
+        chosen_on: ~D[2026-11-14],
+        last_outcome: %{"status" => "passed", "text" => "You did it."}
+    }
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> progress end)
+
+    expect(BotArmyTerrain.StoryStoreMock, :put, fn _tenant, saved ->
+      assert saved.scene_id == "hangar"
+      assert saved.chosen_on == nil
+      assert saved.last_outcome == nil
+      {:ok, saved}
+    end)
+
+    assert {:noreply, _} = ask("terrain.story.next", %{"date" => "2026-11-14"})
   end
 end

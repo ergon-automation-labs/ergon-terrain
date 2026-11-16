@@ -38,6 +38,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       description: "Make the scene's choice (option) or answer the recall gate (gate)"
     },
     %{
+      subject: "terrain.story.next",
+      type: :request_reply,
+      description: "Turn the page after a passed scene, without waiting for tomorrow"
+    },
+    %{
       subject: "terrain.pitch.today",
       type: :request_reply,
       description: "One purpose spot (or one why question) for a project the panel holds"
@@ -220,6 +225,7 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "terrain.tip.today",
       "terrain.story.today",
       "terrain.story.choose",
+      "terrain.story.next",
       "terrain.pitch.today",
       "terrain.pitch.record",
       "terrain.cards.list",
@@ -471,6 +477,20 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
          {:ok, progress, grade} <- story_step(tenant_id, progress, msg, date),
          {:ok, progress} <- story_store().put(tenant_id, progress) do
       grade_story_card(tenant_id, grade)
+      BotArmyLibraryRuntime.NATS.Reply.ok(story_reply(tenant_id, progress, date))
+    else
+      {:error, reason} ->
+        BotArmyLibraryRuntime.NATS.Reply.error(story_error(reason), :story_refused)
+    end
+  end
+
+  defp handle_request("terrain.story.next", msg) do
+    %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
+
+    with {:ok, date} <- tip_date(msg["date"], DateTime.utc_now()),
+         progress = story_store().get(tenant_id) || BotArmyTerrain.Story.start(),
+         {:ok, progress} <- BotArmyTerrain.Story.next(progress, date),
+         {:ok, progress} <- story_store().put(tenant_id, progress) do
       BotArmyLibraryRuntime.NATS.Reply.ok(story_reply(tenant_id, progress, date))
     else
       {:error, reason} ->
@@ -1143,7 +1163,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       )
 
   defp story_error(:already_chosen),
-    do: "this morning's choice is already made — the story goes on tomorrow"
+    do: "this choice is already made — turn the page to go on"
+
+  defp story_error(:gate_open), do: "the recall gate is still waiting for an answer"
+  defp story_error(:not_done), do: "there is no next page until a choice is passed"
 
   defp story_error(:stale_scene), do: "that scene has already been played"
   defp story_error(:no_such_option), do: "that choice is not on this scene"

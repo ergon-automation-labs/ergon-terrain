@@ -133,7 +133,7 @@
         { "fact": "reactor_unverified", "text": "Deep in engineering, the old core *ticks*. **It won't hold forever.**" },
         { "fact": "thorne_distrusts", "text": "Thorne no longer answers your calls. **You'll need her, later.**" }
       ],
-      "ritual": "Chapter Two opens tomorrow morning. Bring a washed face and a stretched back — **the reactor will need both**.",
+      "ritual": "Chapter Two opens when you're ready. Bring a washed face and a stretched back — **the reactor will need both**.",
       "end": true
     }
   }

@@ -36,18 +36,38 @@ defmodule BotArmyTerrain.StoryTest do
     refute inspect(view["choice"]) =~ "outcome"
   end
 
-  test "a right choice moves on, grades 4, and the morning is spent" do
+  test "a right choice moves on, grades 4, and waits on the outcome page" do
     {:ok, p, {card, 4}} = Story.choose(Story.start(), "wake", right_index("wake"), @day, &greek/1)
 
     assert card["deck"] == "Greek"
     assert p.scene_id == "hangar"
     assert {:done, %{"correct" => true}} = Story.today(p, @day)
     assert {:error, :already_chosen} = Story.choose(p, "hangar", 0, @day, &greek/1)
-    assert {:scene, %{"title" => "The Hangar Board"}} = Story.today(p, @tomorrow)
+
+    assert {:ok, p} = Story.next(p, @day)
+    assert {:scene, %{"title" => "The Hangar Board"}} = Story.today(p, @day)
+  end
+
+  test "two scenes can be played in one sitting" do
+    {:ok, p, _} = Story.choose(Story.start(), "wake", right_index("wake"), @day, &greek/1)
+    {:ok, p} = Story.next(p, @day)
+
+    {:ok, p, _} = Story.choose(p, "hangar", right_index("hangar"), @day, &greek/1)
+    {:ok, p} = Story.next(p, @day)
+
+    assert {:scene, %{"title" => "The Green Light"}} = Story.today(p, @day)
+    assert Enum.map(Story.path(p), & &1["title"]) == ["Wake Cycle", "The Hangar Board"]
+  end
+
+  test "there is no next page before a scene is passed" do
+    {:ok, p, _} = Story.choose(Story.start(), "wake", wrong_index("wake"), @day, &greek/1)
+    assert {:error, :gate_open} = Story.next(p, @day)
+    assert {:error, :not_done} = Story.next(Story.start(), @day)
   end
 
   test "a wrong choice costs a fact and opens a gate whose answer stays hidden" do
-    {:ok, p, {_card, 2}} = Story.choose(Story.start(), "wake", wrong_index("wake"), @day, &greek/1)
+    {:ok, p, {_card, 2}} =
+      Story.choose(Story.start(), "wake", wrong_index("wake"), @day, &greek/1)
 
     assert p.scene_id == "wake"
     assert p.facts["airlock_alarm"] == true
@@ -69,14 +89,18 @@ defmodule BotArmyTerrain.StoryTest do
 
     {:ok, failed, {_, 1}} = Story.answer_gate(p, miss, @day)
     assert failed.scene_id == "wake"
-    assert failed.last_outcome["text"] =~ "waits for you tomorrow"
+    assert failed.last_outcome["text"] =~ "waits for you"
     assert {:error, :no_gate} = Story.answer_gate(failed, answer, @day)
-    assert {:scene, %{"title" => "Wake Cycle"}} = Story.today(failed, @tomorrow)
+    assert {:scene, %{"title" => "Wake Cycle"}} = Story.today(failed, @day)
+
+    {:ok, retried, _} = Story.choose(failed, "wake", right_index("wake"), @day, &greek/1)
+    assert retried.scene_id == "hangar"
   end
 
   test "facts come back as echoes in later scenes" do
     {:ok, p, _} = Story.choose(Story.start(), "wake", wrong_index("wake"), @day, &greek/1)
     {:ok, p, _} = Story.answer_gate(p, p.last_outcome["gate"]["answer"], @day)
+    {:ok, p} = Story.next(p, @day)
 
     {:scene, view} = Story.today(p, @tomorrow)
     assert Enum.any?(view["echoes"], &(&1 =~ "alarm made you famous"))
@@ -98,7 +122,12 @@ defmodule BotArmyTerrain.StoryTest do
       p = missed_then_two_on()
 
       assert [
-               %{"kind" => "choice", "title" => "Wake Cycle", "choice" => "Press Όχι", "correct" => false},
+               %{
+                 "kind" => "choice",
+                 "title" => "Wake Cycle",
+                 "choice" => "Press Όχι",
+                 "correct" => false
+               },
                %{"kind" => "gate", "correct" => true},
                %{"kind" => "choice", "title" => "The Hangar Board", "correct" => true},
                %{"kind" => "choice", "title" => "The Green Light", "correct" => true}
