@@ -1,0 +1,42 @@
+{
+  "title": "Season One — The Quiet Archive",
+  "through_line": "Who holds the pen?",
+  "chapters": [
+    {
+      "id": "ch1",
+      "title": "Chapter One — The Quiet Archive",
+      "lesson": "A green light is a claim, not a fact.",
+      "deck": "The System"
+    },
+    {
+      "id": "ch2",
+      "title": "Chapter Two — The Door Decides the Row",
+      "lesson": "The door decides the row.",
+      "deck": "The System"
+    },
+    {
+      "id": "ch3",
+      "title": "Chapter Three — The Smallest Unit",
+      "lesson": "The smallest unit is the blast radius.",
+      "deck": "The System"
+    },
+    {
+      "id": "ch4",
+      "title": "Chapter Four — Rehearsal",
+      "lesson": "Rehearse where no one is listening.",
+      "deck": "The System"
+    },
+    {
+      "id": "ch5",
+      "title": "Chapter Five — The Wait",
+      "lesson": "Waiting is a move.",
+      "deck": "The System"
+    },
+    {
+      "id": "ch6",
+      "title": "Chapter Six — The Pen",
+      "lesson": "Whoever controls what you can see controls what you can know.",
+      "deck": "The System"
+    }
+  ]
+}

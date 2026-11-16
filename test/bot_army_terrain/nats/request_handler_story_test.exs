@@ -16,7 +16,21 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
       send(me, {:graded, msg}) && :ok
     end)
 
-    on_exit(fn -> Application.delete_env(:bot_army_terrain, :story_reviewer) end)
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "terrain_handler_story_test_#{System.unique_integer([:positive])}"
+      )
+
+    Application.put_env(:bot_army_terrain, :story_dir, dir)
+
+    on_exit(fn ->
+      File.rm_rf(dir)
+      Application.delete_env(:bot_army_terrain, :story_dir)
+      Application.delete_env(:bot_army_terrain, :story_reviewer)
+      Application.delete_env(:bot_army_terrain, :story_writer)
+    end)
+
     :ok
   end
 
@@ -97,6 +111,40 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
     end)
 
     assert {:noreply, _} = ask("terrain.story.next", %{"date" => "2026-11-14"})
+  end
+
+  test "at the end of the last published chapter, the writer is asked and the page says it is writing" do
+    me = self()
+
+    Application.put_env(:bot_army_terrain, :story_writer, fn tenant, chapter ->
+      send(me, {:write_next, tenant, chapter})
+      {:ok, :writing}
+    end)
+
+    ended = %{Story.start("ch2") | scene_id: "end"}
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> ended end)
+    expect(BotArmyTerrain.StoryStoreMock, :put, 0, fn _, _ -> {:ok, %{}} end)
+
+    assert {:noreply, _} = ask("terrain.story.today", %{"date" => "2026-11-14"})
+    assert_received {:write_next, _tenant, "ch2"}
+  end
+
+  test "entering a chapter with no next one asks the writer while she reads" do
+    me = self()
+
+    Application.put_env(:bot_army_terrain, :story_writer, fn tenant, chapter ->
+      send(me, {:write_next, tenant, chapter})
+      {:ok, :queued}
+    end)
+
+    progress = Story.start("ch2")
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> progress end)
+    expect(BotArmyTerrain.StoryStoreMock, :put, 0, fn _, _ -> {:ok, %{}} end)
+
+    assert {:noreply, _} = ask("terrain.story.today", %{"date" => "2026-11-14"})
+    assert_received {:write_next, _tenant, "ch2"}
   end
 
   test "the next page clears the outcome and saves the scene that follows" do

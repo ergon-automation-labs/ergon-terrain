@@ -1,11 +1,26 @@
 defmodule BotArmyTerrain.StoryTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   @moduletag :core
 
   alias BotArmyTerrain.Story
 
   @day ~D[2026-11-14]
   @tomorrow ~D[2026-11-15]
+
+  setup do
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "terrain_story_test_#{System.unique_integer([:positive])}"
+      )
+
+    Application.put_env(:bot_army_terrain, :story_dir, dir)
+
+    on_exit(fn ->
+      File.rm_rf(dir)
+      Application.delete_env(:bot_army_terrain, :story_dir)
+    end)
+  end
 
   defp greek(_deck) do
     [
@@ -35,6 +50,32 @@ defmodule BotArmyTerrain.StoryTest do
     assert Enum.map(Story.chapters(), & &1["id"]) == ["ch1", "ch2"]
     assert Story.next_chapter("ch1")["id"] == "ch2"
     assert Story.next_chapter("ch2") == nil
+  end
+
+  test "the season names a lesson for every chapter, including the ones not written yet" do
+    assert Story.season()["through_line"] == "Who holds the pen?"
+    assert Story.season_chapter("ch1")["lesson"] == "A green light is a claim, not a fact."
+    assert Story.next_season_chapter("ch2")["id"] == "ch3"
+    assert Story.next_season_chapter("ch6") == nil
+  end
+
+  test "a chapter written at runtime joins the reading order after the canon" do
+    chapter =
+      Story.chapter("ch2")
+      |> Map.put("id", "ch9")
+      |> Map.put("title", "Chapter Nine — The Test")
+
+    assert {:ok, path} = Story.publish_chapter(chapter)
+    assert File.exists?(path)
+    assert Story.chapter("ch9")["title"] == "Chapter Nine — The Test"
+    assert Story.next_chapter("ch2")["id"] == "ch9"
+  end
+
+  test "canon wins over a runtime chapter with the same id" do
+    chapter = Story.chapter("ch2") |> Map.put("title", "Overwritten")
+
+    assert {:ok, _path} = Story.publish_chapter(chapter)
+    assert Story.chapter("ch2")["title"] == "Chapter Two — The Door Decides the Row"
   end
 
   test "the end of a chapter offers the next one, and the facts travel" do

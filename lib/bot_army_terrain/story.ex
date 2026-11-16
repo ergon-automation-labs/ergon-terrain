@@ -14,12 +14,22 @@ defmodule BotArmyTerrain.Story do
   handler to send through the normal review path.
   """
 
+  require Logger
+
   @chapter_dir Path.expand("../../priv/story", __DIR__)
   @chapter_paths Path.wildcard(Path.join(@chapter_dir, "chapter_*.json"))
   for path <- @chapter_paths, do: @external_resource(path)
 
+  @season_path Path.join(@chapter_dir, "season.json")
+  @external_resource @season_path
+
   @ordered_chapters Enum.map(@chapter_paths, &(&1 |> File.read!() |> Jason.decode!()))
   @chapter Enum.find(@ordered_chapters, &(&1["id"] == "ch1")) || hd(@ordered_chapters)
+
+  @season (case File.read(@season_path) do
+             {:ok, body} -> Jason.decode!(body)
+             _ -> %{"chapters" => []}
+           end)
 
   # 4 is cold, unassisted retrieval. A choice on the page is cued by its options, so a right
   # choice earns 3; the gate asks the card plainly and earns 4.
@@ -34,22 +44,91 @@ defmodule BotArmyTerrain.Story do
   def chapter, do: @chapter
 
   @doc "A chapter by its id, or nil when no such chapter exists."
-  def chapter(id) when is_binary(id), do: Enum.find(@ordered_chapters, &(&1["id"] == id))
+  def chapter(id) when is_binary(id), do: Enum.find(chapters(), &(&1["id"] == id))
 
   @doc "The chapter after `id`, in reading order, or nil at the end of the season."
   def next_chapter(id) when is_binary(id) do
-    ids = Enum.map(@ordered_chapters, & &1["id"])
+    chapters = chapters()
+    ids = Enum.map(chapters, & &1["id"])
 
     case Enum.find_index(ids, &(&1 == id)) do
       nil -> nil
-      i -> Enum.at(@ordered_chapters, i + 1)
+      i -> Enum.at(chapters, i + 1)
     end
   end
 
   def next_chapter(_id), do: nil
 
-  @doc "Every published chapter, in reading order."
-  def chapters, do: @ordered_chapters
+  # A chapter written while the story is playing is a file in the runtime story directory.
+  # The compiled chapters are the canon and always win a collision; runtime chapters follow in
+  # filename order. The signature is stat-only, so the hot read path never parses a chapter it
+  # already has.
+  @doc "Every published chapter, canon first, then any chapters written at runtime."
+  def chapters do
+    files = chapter_files()
+    signature = Enum.map(files, &file_signature/1)
+    key = {__MODULE__, :chapters, story_dir()}
+
+    case :persistent_term.get(key, nil) do
+      %{signature: ^signature, chapters: chapters} ->
+        chapters
+
+      _ ->
+        chapters =
+          files
+          |> Enum.map(&read_chapter/1)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq_by(& &1["id"])
+
+        :persistent_term.put(key, %{signature: signature, chapters: chapters})
+        chapters
+    end
+  end
+
+  @doc "Where runtime-written chapters live. The working directory is the bot's own."
+  def story_dir do
+    Application.get_env(
+      :bot_army_terrain,
+      :story_dir,
+      "/var/lib/bot_army/terrain_bot/story"
+    )
+  end
+
+  @doc "The season plan: the through-line and the lesson each chapter must teach."
+  def season, do: @season
+
+  @doc "The season entry for a chapter id, or nil."
+  def season_chapter(id) when is_binary(id) do
+    Enum.find(@season["chapters"] || [], &(&1["id"] == id))
+  end
+
+  def season_chapter(_id), do: nil
+
+  @doc "The next season entry after `id`, even when its chapter has not been written yet."
+  def next_season_chapter(id) when is_binary(id) do
+    chapters = @season["chapters"] || []
+    ids = Enum.map(chapters, & &1["id"])
+
+    case Enum.find_index(ids, &(&1 == id)) do
+      nil -> nil
+      i -> Enum.at(chapters, i + 1)
+    end
+  end
+
+  def next_season_chapter(_id), do: nil
+
+  @doc "Write a chapter into the runtime story directory, atomically."
+  def publish_chapter(%{"id" => id} = chapter) when is_binary(id) do
+    dir = story_dir()
+    path = Path.join(dir, "chapter_#{id}.json")
+    tmp = path <> ".tmp"
+
+    with :ok <- File.mkdir_p(dir),
+         :ok <- File.write(tmp, Jason.encode!(chapter, pretty: true)),
+         :ok <- File.rename(tmp, path) do
+      {:ok, path}
+    end
+  end
 
   @doc "Progress for a story that has not started."
   def start, do: start(@chapter["id"])
@@ -509,6 +588,30 @@ defmodule BotArmyTerrain.Story do
     case outcome["gate"] do
       nil -> Map.delete(outcome, "gate")
       gate -> Map.put(outcome, "gate", Map.delete(gate, "answer"))
+    end
+  end
+
+  defp chapter_files do
+    canon = Path.wildcard(Path.join(@chapter_dir, "chapter_*.json"))
+    runtime = Path.wildcard(Path.join(story_dir(), "chapter_*.json"))
+    Enum.sort(canon) ++ Enum.sort(runtime)
+  end
+
+  defp file_signature(path) do
+    case File.stat(path) do
+      {:ok, %File.Stat{mtime: mtime, size: size}} -> {path, mtime, size}
+      _ -> {path, nil, nil}
+    end
+  end
+
+  defp read_chapter(path) do
+    with {:ok, body} <- File.read(path),
+         {:ok, %{} = chapter} <- Jason.decode(body) do
+      chapter
+    else
+      {:error, reason} ->
+        Logger.warning("Terrain: ignoring unreadable story chapter #{path}: #{inspect(reason)}")
+        nil
     end
   end
 end

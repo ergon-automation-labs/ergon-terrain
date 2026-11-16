@@ -1099,6 +1099,12 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp story_step(_tenant_id, _progress, _msg, _date), do: {:error, :no_such_option}
 
   defp story_reply(tenant_id, progress, date) do
+    progress
+    |> build_story_reply(tenant_id, date)
+    |> maybe_write_next(tenant_id, progress, date)
+  end
+
+  defp build_story_reply(progress, tenant_id, date) do
     {mode, body} = BotArmyTerrain.Story.today(progress, date)
 
     body =
@@ -1122,6 +1128,73 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "note" => BotArmyTerrain.Story.redeem_note(progress, date),
       "path" => BotArmyTerrain.Story.path(progress)
     }
+  end
+
+  # The page never waits on a model. When the chapter she is in has no next chapter yet, the
+  # writer is asked at the first scene (prefetch); at the end, the page either turns itself or
+  # says the press is still setting the type and polls again.
+  defp maybe_write_next(%{"mode" => "end"} = reply, tenant_id, progress, date) do
+    if reply["body"]["next_chapter"] do
+      reply
+    else
+      case ask_story_writer(tenant_id, progress.chapter) do
+        {:ok, :ready} -> build_story_reply(progress, tenant_id, date)
+        {:error, :no_next_chapter} -> reply
+        _ -> writing_reply(progress, date)
+      end
+    end
+  end
+
+  defp maybe_write_next(%{"mode" => "scene"} = reply, tenant_id, progress, _date) do
+    if BotArmyTerrain.Story.next_chapter(progress.chapter) == nil do
+      ask_story_writer(tenant_id, progress.chapter)
+    end
+
+    reply
+  end
+
+  defp maybe_write_next(reply, _tenant_id, _progress, _date), do: reply
+
+  defp writing_reply(progress, date) do
+    next = BotArmyTerrain.Story.next_season_chapter(progress.chapter)
+
+    %{
+      "date" => Date.to_iso8601(date),
+      "chapter" =>
+        (BotArmyTerrain.Story.chapter(progress.chapter) || BotArmyTerrain.Story.chapter())[
+          "title"
+        ],
+      "scene_id" => progress.scene_id,
+      "mode" => "writing",
+      "body" => %{
+        "title" => (next && next["title"]) || "The next chapter",
+        "text" => "The press is setting the type. This page turns itself when it's ready.",
+        "writing" => true,
+        "retry_after_ms" => 5_000
+      },
+      "note" => nil,
+      "path" => BotArmyTerrain.Story.path(progress)
+    }
+  end
+
+  defp ask_story_writer(tenant_id, chapter_id) do
+    try do
+      story_writer().(tenant_id, chapter_id)
+    rescue
+      error ->
+        Logger.warning("Story writer unavailable: #{Exception.message(error)}")
+        {:error, :writer_unavailable}
+    catch
+      :exit, _ -> {:error, :writer_unavailable}
+    end
+  end
+
+  defp story_writer do
+    Application.get_env(
+      :bot_army_terrain,
+      :story_writer,
+      &BotArmyTerrain.StoryWriter.ensure/2
+    )
   end
 
   # A term's card, asked as a question — never its answer. The hover is a cue, not a leak: the

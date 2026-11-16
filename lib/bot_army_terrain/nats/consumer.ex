@@ -47,6 +47,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
       subject: "events.llm.completion.terrain.game_generation",
       type: :subscribe,
       description: "Game generation"
+    },
+    %{
+      subject: "events.llm.completion.terrain.story_generation",
+      type: :subscribe,
+      description: "Story chapter generation"
     }
   ]
 
@@ -141,7 +146,8 @@ defmodule BotArmyTerrain.NATS.Consumer do
       "events.llm.response.parsed",
       "events.llm.embedding.created",
       "events.llm.completion.terrain.lesson_generation",
-      "events.llm.completion.terrain.game_generation"
+      "events.llm.completion.terrain.game_generation",
+      "events.llm.completion.terrain.story_generation"
     ]
 
     subs =
@@ -296,6 +302,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   defp handle_command("events.llm.completion.terrain.game_generation", msg) do
     BotArmyTerrain.Handlers.GameCompletionHandler.handle_completion(msg)
+    :ok
+  end
+
+  defp handle_command("events.llm.completion.terrain.story_generation", msg) do
+    BotArmyTerrain.StoryWriter.complete(msg)
     :ok
   end
 
