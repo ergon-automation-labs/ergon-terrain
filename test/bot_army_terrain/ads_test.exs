@@ -95,6 +95,33 @@ defmodule BotArmyTerrain.AdsTest do
     assert Ads.silenced?([%{occurred_on: ~D[2026-11-16]}, previous], ~D[2026-11-16])
   end
 
+  test "two impressions in the household day are a full day" do
+    creative = %{"id" => "ch1-trailer-ch2", "lesson" => "The door decides the row."}
+
+    events = [
+      %{occurred_on: ~D[2026-11-16], creative_id: "ch1-trailer-ch2"},
+      %{occurred_on: ~D[2026-11-16], creative_id: "ch1-recap-ch2"}
+    ]
+
+    assert Ads.capped?(events, ~D[2026-11-16], creative)
+    refute Ads.capped?(Enum.take(events, 1), ~D[2026-11-16], creative)
+    refute Ads.capped?(events, ~D[2026-11-17], creative)
+  end
+
+  test "three impressions about one lesson in the window are a full lesson" do
+    creative = %{"id" => "ch1-trailer-ch2", "lesson" => "The door decides the row."}
+
+    events =
+      for day <- 14..16 do
+        %{occurred_on: Date.new!(2026, 11, day), creative_id: "ch1-trailer-ch2"}
+      end
+
+    assert Ads.capped?(events, ~D[2026-11-16], creative)
+
+    other = %{"id" => "ch3-sponsor-ch1", "lesson" => "A green light is a claim, not a fact."}
+    refute Ads.capped?(events, ~D[2026-11-16], other)
+  end
+
   test "one skip is not a silence" do
     refute Ads.silenced?([%{"occurred_on" => ~D[2026-11-16]}], ~D[2026-11-16])
     refute Ads.silenced?([], ~D[2026-11-16])

@@ -3,4 +3,6 @@ defmodule BotArmyTerrain.AdEventStoreBehaviour do
 
   @callback record(tenant_id :: binary(), attrs :: map()) :: {:ok, map()} | {:error, term()}
   @callback recent(tenant_id :: binary(), kind :: binary(), limit :: pos_integer()) :: [map()]
+  @callback impressions_since(tenant_id :: binary(), since :: Date.t()) :: [map()]
+  @callback seen?(tenant_id :: binary(), boundary_key :: binary()) :: boolean()
 end

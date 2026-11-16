@@ -24,8 +24,34 @@ defmodule BotArmyTerrain.Ads do
   @chapter_start_slot "chapter_start"
   @sponsor_min_age 2
   @silence_days 7
+  @max_per_day 2
+  @max_per_lesson 3
 
-  @doc "Whether interstitials are allowed at all. `false` is absolute."
+  @doc """
+  Whether the catalogue has already spent its budget for `creative` on `date`.
+
+  `events` are impression rows from the last week (`AdEventStore.impressions_since/2`). Two
+  impressions in the household day is a full day; three about one lesson in the window is a
+  full lesson. A boundary she has already seen is handled separately by `seen?/2`, because a
+  refresh is not a second airing.
+  """
+  def capped?(events, date, creative) when is_list(events) and is_map(creative) do
+    daily_count(events, date) >= @max_per_day or
+      lesson_count(events, creative["lesson"]) >= @max_per_lesson
+  end
+
+  def capped?(_events, _date, _creative), do: false
+
+  @doc "Every creative that teaches `lesson`, by id. Used to count a lesson's airings."
+  def lesson_creative_ids(lesson) when is_binary(lesson) do
+    creatives()
+    |> Enum.filter(&(&1["lesson"] == lesson))
+    |> Enum.map(& &1["id"])
+  end
+
+  def lesson_creative_ids(_lesson), do: []
+
+  @doc "Whether interstitials are allowed at all. `false` is absolute for commercials."
   def enabled? do
     Application.get_env(:bot_army_terrain, :ads_enabled, true) != false
   end
@@ -247,6 +273,24 @@ defmodule BotArmyTerrain.Ads do
 
   # The compile-time path is the source checkout. A release carries the same files under
   # `:code.priv_dir/1`, and that is the one the running bot can read.
+  defp daily_count(events, date) do
+    Enum.count(events, &same_day?(field(&1, :occurred_on), date))
+  end
+
+  defp lesson_count(events, lesson) do
+    ids = MapSet.new(lesson_creative_ids(lesson))
+
+    Enum.count(events, fn event ->
+      MapSet.member?(ids, field(event, :creative_id))
+    end)
+  end
+
+  defp same_day?(value, date), do: value == date or value == Date.to_iso8601(date)
+
+  defp field(event, key) when is_map(event) do
+    Map.get(event, key) || Map.get(event, Atom.to_string(key))
+  end
+
   defp builtin_creatives_dir do
     case :code.priv_dir(:bot_army_terrain) do
       path when is_list(path) -> Path.join([List.to_string(path), "ads", "creatives"])

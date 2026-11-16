@@ -1164,21 +1164,40 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   # began, chosen from the local creative catalogue, and never for a page still being written.
   # A recap is story, not inventory, so neither `ads_enabled: false` nor a skipped commercial
   # keeps it off the first scene. Only the end-of-chapter trailer obeys the silence rule.
-  defp with_interstitial(:scene, body, progress, date, _tenant_id) do
-    case BotArmyTerrain.Ads.for_scene(progress, date) do
-      nil -> body
-      ad -> Map.put(body, "interstitial", ad)
-    end
+  defp with_interstitial(:scene, body, progress, date, tenant_id) do
+    ad = BotArmyTerrain.Ads.for_scene(progress, date)
+
+    if ad && not ad_seen?(tenant_id, ad["boundary_key"]), do: put_ad(body, ad), else: body
   end
 
   defp with_interstitial(:end, body, progress, date, tenant_id) do
-    case BotArmyTerrain.Ads.for_chapter(progress, date, silent: ad_silent?(tenant_id, date)) do
-      nil -> body
-      ad -> Map.put(body, "interstitial", ad)
-    end
+    ad = BotArmyTerrain.Ads.for_chapter(progress, date, silent: ad_silent?(tenant_id, date))
+
+    if ad && commercial_allowed?(tenant_id, date, ad), do: put_ad(body, ad), else: body
   end
 
   defp with_interstitial(_mode, body, _progress, _date, _tenant_id), do: body
+
+  defp put_ad(body, ad), do: Map.put(body, "interstitial", ad)
+
+  defp commercial_allowed?(tenant_id, date, ad) do
+    not ad_seen?(tenant_id, ad["boundary_key"]) and
+      not BotArmyTerrain.Ads.capped?(ad_impressions(tenant_id, date), date, ad)
+  end
+
+  # A cap is advisory: a store that cannot answer must not take the page down. Unknown budget
+  # is treated as available, and an unknown boundary as unseen.
+  defp ad_impressions(tenant_id, date) do
+    ad_event_store().impressions_since(tenant_id, Date.add(date, -6))
+  rescue
+    _ -> []
+  end
+
+  defp ad_seen?(tenant_id, boundary_key) do
+    ad_event_store().seen?(tenant_id, boundary_key)
+  rescue
+    _ -> false
+  end
 
   # Two skipped interstitials in a row are a clear "not this": the catalogue goes quiet for a
   # week. The read is advisory, so a store that cannot answer must not take the story down with

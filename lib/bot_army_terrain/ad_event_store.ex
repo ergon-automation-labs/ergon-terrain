@@ -4,7 +4,8 @@ defmodule BotArmyTerrain.AdEventStore do
 
   A record is idempotent by `(tenant, creative, kind, boundary)`: the boundary is a page she
   can refresh, and a second impression is not a second airing. `recent/3` is newest first and
-  is what the silence rule reads.
+  is what the silence rule reads. `impressions_since/2` and `seen?/2` are what the caps read:
+  two a day, three per lesson a week, and never the same boundary twice.
   """
 
   @behaviour BotArmyTerrain.AdEventStoreBehaviour
@@ -33,6 +34,29 @@ defmodule BotArmyTerrain.AdEventStore do
       {:ok, event} -> {:ok, Map.take(event, @fields)}
       {:error, changeset} -> {:error, changeset}
     end
+  end
+
+  @impl true
+  def impressions_since(tenant_id, since) do
+    from(event in AdEvent,
+      where:
+        event.tenant_id == ^tenant_id and event.kind == "impression" and
+          event.occurred_on >= ^since,
+      order_by: [desc: event.inserted_at, desc: event.id]
+    )
+    |> Repo.all()
+    |> Enum.map(&Map.take(&1, @fields))
+  end
+
+  @impl true
+  def seen?(tenant_id, boundary_key) do
+    Repo.exists?(
+      from(event in AdEvent,
+        where:
+          event.tenant_id == ^tenant_id and event.kind == "impression" and
+            event.boundary_key == ^boundary_key
+      )
+    )
   end
 
   @impl true
