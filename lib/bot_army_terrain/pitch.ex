@@ -29,9 +29,15 @@ defmodule BotArmyTerrain.Pitch do
   @spec pick([project()], %{optional(String.t()) => state()}, DateTime.t()) :: map() | nil
   def pick(projects, states, now \\ DateTime.utc_now())
 
-  def pick(projects, states, %DateTime{} = now) when is_list(projects) and is_map(states) do
-    today = DateTime.to_date(now)
+  def pick(projects, states, %DateTime{} = now),
+    do: pick(projects, states, now, DateTime.to_date(now))
 
+  @spec pick([project()], %{optional(String.t()) => state()}, DateTime.t(), Date.t()) ::
+          map() | nil
+  def pick(projects, states, now, today)
+
+  def pick(projects, states, %DateTime{} = now, %Date{} = today)
+      when is_list(projects) and is_map(states) do
     candidates =
       projects
       |> Enum.map(&candidate/1)
@@ -65,7 +71,7 @@ defmodule BotArmyTerrain.Pitch do
     end
   end
 
-  def pick(_projects, _states, _now), do: nil
+  def pick(_projects, _states, _now, _today), do: nil
 
   @doc """
   Trim and bound her sentence. Blank is not a why; too long is not a sentence.

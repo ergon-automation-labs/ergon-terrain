@@ -491,8 +491,11 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
           |> pitch_store().all()
           |> Map.new(&{&1.project_id, &1})
 
+        now = DateTime.utc_now()
+        today = pitch_date(msg, now)
+
         BotArmyLibraryRuntime.NATS.Reply.ok(%{
-          "pitch" => BotArmyTerrain.Pitch.pick(projects, states, DateTime.utc_now())
+          "pitch" => BotArmyTerrain.Pitch.pick(projects, states, now, today)
         })
 
       _other ->
@@ -991,20 +994,20 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
   defp pitch_store,
     do: Application.get_env(:bot_army_terrain, :pitch_store, BotArmyTerrain.PitchStore)
 
-  defp pitch_attrs(%{"event" => "shown"}, state, now) do
+  defp pitch_attrs(%{"event" => "shown"} = msg, state, now) do
     {:ok,
      %{
        last_shown_at: now,
-       last_shown_on: DateTime.to_date(now),
+       last_shown_on: pitch_date(msg, now),
        shown_count: count(state, :shown_count) + 1
      }}
   end
 
-  defp pitch_attrs(%{"event" => "start"}, state, now) do
+  defp pitch_attrs(%{"event" => "start"} = msg, state, now) do
     {:ok,
      %{
        last_shown_at: now,
-       last_shown_on: DateTime.to_date(now),
+       last_shown_on: pitch_date(msg, now),
        last_started_at: now,
        start_count: count(state, :start_count) + 1
      }}
@@ -1034,6 +1037,18 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
 
   defp count(nil, _field), do: 0
   defp count(state, field), do: Map.get(state, field) || 0
+
+  # The household's day is the panel's, not the server's: air and mini can be on different
+  # sides of midnight. The date is taken from the request when it is a real one and falls
+  # back to the server's day for a caller that does not send it.
+  defp pitch_date(%{"date" => date}, now) when is_binary(date) do
+    case Date.from_iso8601(date) do
+      {:ok, date} -> date
+      _ -> DateTime.to_date(now)
+    end
+  end
+
+  defp pitch_date(_msg, now), do: DateTime.to_date(now)
 
   defp pitch_error(:missing_project_id), do: "project_id required"
   defp pitch_error(:blank_why), do: "the why needs a sentence"

@@ -59,6 +59,13 @@ defmodule BotArmyTerrain.PitchTest do
     assert Pitch.pick([project()], states, @now) == nil
   end
 
+  test "the day is the household's, not the server's" do
+    states = %{"p1" => %{last_shown_on: ~D[2026-11-16]}}
+
+    assert Pitch.pick([project()], states, @now, ~D[2026-11-16]) == nil
+    assert Pitch.pick([project()], states, @now, ~D[2026-11-15])["kind"] == "spot"
+  end
+
   test "a project shown this week waits, and one shown longer ago does not" do
     recent = %{"p1" => %{last_shown_at: DateTime.add(@now, -3 * 86_400, :second)}}
     old = %{"p1" => %{last_shown_at: DateTime.add(@now, -8 * 86_400, :second)}}
