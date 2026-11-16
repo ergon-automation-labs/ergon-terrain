@@ -28,6 +28,7 @@ defmodule BotArmyTerrain.Ads do
   @max_per_lesson 3
   @required_fields ~w(id kind slot air_after title body lesson)
   @kinds ~w(trailer sponsor recap correction psa)
+  @runtime_ads_default "/var/lib/bot_army/terrain_bot/ads"
 
   @doc """
   Whether the catalogue has already spent its budget for `creative` on `date`.
@@ -143,6 +144,56 @@ defmodule BotArmyTerrain.Ads do
     creative_files()
     |> Enum.flat_map(&read_creative/1)
   end
+
+  @doc """
+  Which kinds of interstitial already exist for the boundary after `chapter_id`.
+
+  The producer uses this to stay out of the way of authored canon: if a chapter boundary
+  already has a recap and a trailer, there is nothing to write.
+  """
+  def coverage(chapter_id) do
+    creatives = creatives()
+
+    %{
+      "recap" =>
+        Enum.any?(creatives, fn creative ->
+          creative["kind"] == "recap" and creative["slot"] == @chapter_start_slot and
+            creative["air_after"] == chapter_id
+        end),
+      "trailer" =>
+        Enum.any?(creatives, fn creative ->
+          creative["kind"] == "trailer" and creative["slot"] == @slot and
+            creative["air_after"] == chapter_id
+        end)
+    }
+  end
+
+  @doc "The directory a producer writes new creatives into."
+  def ads_dir do
+    Application.get_env(:bot_army_terrain, :ads_dir, @runtime_ads_default)
+  end
+
+  @doc """
+  Write one creative into the runtime catalogue, atomically.
+
+  The file is the durable artifact; a crash between rename and reply leaves a complete creative
+  or none at all.
+  """
+  def publish_creative(%{"id" => id} = creative) when is_binary(id) do
+    dir = ads_dir()
+    path = Path.join(dir, file_name(id))
+    tmp = path <> ".tmp"
+
+    with :ok <- File.mkdir_p(dir),
+         :ok <- File.write(tmp, Jason.encode!(creative, pretty: true) <> "\n"),
+         :ok <- File.rename(tmp, path) do
+      {:ok, path}
+    end
+  end
+
+  def publish_creative(_creative), do: {:error, :missing_id}
+
+  defp file_name(id), do: Regex.replace(~r/[^A-Za-z0-9_-]/, id, "_") <> ".json"
 
   @doc "Whether a creative leaks an answer from `chapter`."
   def answer_free?(creative, nil), do: not blank?(creative_text(creative))
@@ -282,7 +333,7 @@ defmodule BotArmyTerrain.Ads do
 
   defp creative_files do
     dirs =
-      [builtin_creatives_dir(), Application.get_env(:bot_army_terrain, :ads_dir)]
+      [builtin_creatives_dir(), ads_dir()]
       |> Enum.reject(&is_nil/1)
 
     dirs
@@ -291,8 +342,6 @@ defmodule BotArmyTerrain.Ads do
     |> Enum.sort()
   end
 
-  # The compile-time path is the source checkout. A release carries the same files under
-  # `:code.priv_dir/1`, and that is the one the running bot can read.
   defp validate_creative(creative) do
     id = creative["id"] || "(no id)"
 
@@ -448,6 +497,8 @@ defmodule BotArmyTerrain.Ads do
     Map.get(event, key) || Map.get(event, Atom.to_string(key))
   end
 
+  # The compile-time path is the source checkout. A release carries the same files under
+  # `:code.priv_dir/1`, and that is the one the running bot can read.
   defp builtin_creatives_dir do
     case :code.priv_dir(:bot_army_terrain) do
       path when is_list(path) -> Path.join([List.to_string(path), "ads", "creatives"])

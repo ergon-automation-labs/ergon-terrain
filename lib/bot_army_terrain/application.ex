@@ -30,6 +30,7 @@ defmodule BotArmyTerrain.Application do
       |> maybe_add_game_state_store()
       |> maybe_add_game_generation_worker()
       |> maybe_add_story_writer()
+      |> maybe_add_ads_producer()
       |> maybe_add_pulse_publisher()
       |> maybe_add_outcome_tracker()
       |> add_nats_children(@env)
@@ -98,6 +99,10 @@ defmodule BotArmyTerrain.Application do
 
   defp maybe_add_story_writer(children) do
     if @env == :test, do: children, else: [{BotArmyTerrain.StoryWriter, []} | children]
+  end
+
+  defp maybe_add_ads_producer(children) do
+    if @env == :test, do: children, else: [{BotArmyTerrain.AdsProducer, []} | children]
   end
 
   defp maybe_add_pulse_publisher(children) do

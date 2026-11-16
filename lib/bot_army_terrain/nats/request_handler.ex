@@ -466,9 +466,10 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
     %{tenant_id: tenant_id} = BotArmyLibraryCore.Tenant.extract_context(msg)
 
     with {:ok, date} <- tip_date(msg["date"], DateTime.utc_now()),
-         progress = story_store().get(tenant_id) || BotArmyTerrain.Story.start(),
-         {:ok, progress} <- BotArmyTerrain.Story.next(progress, date),
+         previous = story_store().get(tenant_id) || BotArmyTerrain.Story.start(),
+         {:ok, progress} <- BotArmyTerrain.Story.next(previous, date),
          {:ok, progress} <- story_store().put(tenant_id, progress) do
+      maybe_produce_ads(tenant_id, previous, progress)
       BotArmyLibraryRuntime.NATS.Reply.ok(story_reply(tenant_id, progress, date))
     else
       {:error, reason} ->
@@ -1255,6 +1256,44 @@ defmodule BotArmyTerrain.NATS.RequestHandler do
       "note" => nil,
       "path" => BotArmyTerrain.Story.path(progress)
     }
+  end
+
+  # Turning the last page of a chapter is the one moment both interstitials for that boundary
+  # become knowable: the lesson she just used and the lesson the next chapter must earn. The
+  # producer only queues a job here; the page does not wait for a model.
+  defp maybe_produce_ads(tenant_id, %{chapter: old_id, scene_id: scene_id}, %{chapter: new_id})
+       when old_id != new_id do
+    if chapter_end?(old_id, scene_id), do: ask_ads_producer(tenant_id, old_id)
+  end
+
+  defp maybe_produce_ads(_tenant_id, _previous, _progress), do: :ok
+
+  defp chapter_end?(chapter_id, scene_id) do
+    case BotArmyTerrain.Story.scene(chapter_id, scene_id) do
+      %{"end" => true} -> true
+      _ -> false
+    end
+  end
+
+  defp ask_ads_producer(tenant_id, chapter_id) do
+    try do
+      ads_producer().(tenant_id, chapter_id)
+    rescue
+      error ->
+        Logger.warning("Terrain: ad producer unavailable: #{Exception.message(error)}")
+
+        {:error, :producer_unavailable}
+    catch
+      :exit, _ -> {:error, :producer_unavailable}
+    end
+  end
+
+  defp ads_producer do
+    Application.get_env(
+      :bot_army_terrain,
+      :ads_producer,
+      &BotArmyTerrain.AdsProducer.ensure/2
+    )
   end
 
   defp ask_story_writer(tenant_id, chapter_id) do

@@ -31,6 +31,7 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
       Application.delete_env(:bot_army_terrain, :story_dir)
       Application.delete_env(:bot_army_terrain, :story_reviewer)
       Application.delete_env(:bot_army_terrain, :story_writer)
+      Application.delete_env(:bot_army_terrain, :ads_producer)
     end)
 
     :ok
@@ -113,6 +114,23 @@ defmodule BotArmyTerrain.NATS.RequestHandlerStoryTest do
     end)
 
     assert {:noreply, _} = ask("terrain.story.next", %{"date" => "2026-11-14"})
+  end
+
+  test "turning the last page queues the boundary's interstitials" do
+    me = self()
+
+    Application.put_env(:bot_army_terrain, :ads_producer, fn tenant, chapter ->
+      send(me, {:produce_ads, tenant, chapter})
+      {:ok, :queued}
+    end)
+
+    ended = %{Story.start() | scene_id: "end"}
+
+    expect(BotArmyTerrain.StoryStoreMock, :get, fn _ -> ended end)
+    expect(BotArmyTerrain.StoryStoreMock, :put, fn _, progress -> {:ok, progress} end)
+
+    assert {:noreply, _} = ask("terrain.story.next", %{"date" => "2026-11-14"})
+    assert_received {:produce_ads, _tenant, "ch1"}
   end
 
   test "at the end of the last published chapter, the writer is asked and the page says it is writing" do

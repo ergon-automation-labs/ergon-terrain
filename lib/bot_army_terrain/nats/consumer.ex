@@ -52,6 +52,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
       subject: "events.llm.completion.terrain.story_generation",
       type: :subscribe,
       description: "Story chapter generation"
+    },
+    %{
+      subject: "events.llm.completion.terrain.story_ads",
+      type: :subscribe,
+      description: "Story interstitial generation"
     }
   ]
 
@@ -139,16 +144,9 @@ defmodule BotArmyTerrain.NATS.Consumer do
   end
 
   defp subscribe(conn, state) do
-    subjects = [
-      "bot.army.terrain.command.ingest",
-      "bot.army.terrain.command.import_cards",
-      "bot.army.terrain.command.generate_cards",
-      "events.llm.response.parsed",
-      "events.llm.embedding.created",
-      "events.llm.completion.terrain.lesson_generation",
-      "events.llm.completion.terrain.game_generation",
-      "events.llm.completion.terrain.story_generation"
-    ]
+    # Registry metadata and the subscription list were hand-duplicated, and a new subject could
+    # be advertised without ever being subscribed. There is one list; this is it.
+    subjects = @subjects |> Enum.map(& &1.subject) |> Enum.uniq()
 
     subs =
       Enum.map(subjects, fn subject ->
@@ -307,6 +305,11 @@ defmodule BotArmyTerrain.NATS.Consumer do
 
   defp handle_command("events.llm.completion.terrain.story_generation", msg) do
     BotArmyTerrain.StoryWriter.complete(msg)
+    :ok
+  end
+
+  defp handle_command("events.llm.completion.terrain.story_ads", msg) do
+    BotArmyTerrain.AdsProducer.complete(msg)
     :ok
   end
 
