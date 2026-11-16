@@ -592,9 +592,18 @@ defmodule BotArmyTerrain.Story do
   end
 
   defp chapter_files do
-    canon = Path.wildcard(Path.join(@chapter_dir, "chapter_*.json"))
+    canon = Path.wildcard(Path.join(builtin_dir(), "chapter_*.json"))
     runtime = Path.wildcard(Path.join(story_dir(), "chapter_*.json"))
     Enum.sort(canon) ++ Enum.sort(runtime)
+  end
+
+  # `@chapter_dir` is the source checkout, which is where the compiler read the canon. A
+  # release does not carry that path: the files it carries are under `:code.priv_dir/1`.
+  defp builtin_dir do
+    case :code.priv_dir(:bot_army_terrain) do
+      path when is_list(path) -> Path.join(List.to_string(path), "story")
+      _ -> @chapter_dir
+    end
   end
 
   defp file_signature(path) do

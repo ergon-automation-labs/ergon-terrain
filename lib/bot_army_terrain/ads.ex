@@ -162,12 +162,22 @@ defmodule BotArmyTerrain.Ads do
 
   defp creative_files do
     dirs =
-      [@creatives_dir, Application.get_env(:bot_army_terrain, :ads_dir)] |> Enum.reject(&is_nil/1)
+      [builtin_creatives_dir(), Application.get_env(:bot_army_terrain, :ads_dir)]
+      |> Enum.reject(&is_nil/1)
 
     dirs
     |> Enum.uniq()
     |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*.json")))
     |> Enum.sort()
+  end
+
+  # The compile-time path is the source checkout. A release carries the same files under
+  # `:code.priv_dir/1`, and that is the one the running bot can read.
+  defp builtin_creatives_dir do
+    case :code.priv_dir(:bot_army_terrain) do
+      path when is_list(path) -> Path.join([List.to_string(path), "ads", "creatives"])
+      _ -> @creatives_dir
+    end
   end
 
   defp read_creative(path) do
